@@ -107,6 +107,7 @@ ID3D11DepthStencilView* pDepthStencilView;
 
 ID3D11DepthStencilState* subtractStencilState;
 ID3D11DepthStencilState* paintStencilState;
+ID3D11DepthStencilState* nullStencilState;
 
 //_____________________________________________________________BLENDING
 ID3D11BlendState* blendState;
@@ -370,7 +371,14 @@ void UD::InitD3D(){
 	depthStencilStateDesc.FrontFace.StencilFunc			= D3D11_COMPARISON_NOT_EQUAL;
 	printf("createDepthStencilState 2 : %x\n", this->device->CreateDepthStencilState(&depthStencilStateDesc, &paintStencilState));
 
-	
+	depthStencilStateDesc.FrontFace.StencilPassOp		= D3D11_STENCIL_OP_KEEP;
+	depthStencilStateDesc.FrontFace.StencilFailOp		= D3D11_STENCIL_OP_KEEP;
+	depthStencilStateDesc.FrontFace.StencilDepthFailOp	= D3D11_STENCIL_OP_KEEP;
+	depthStencilStateDesc.FrontFace.StencilFunc			= D3D11_COMPARISON_ALWAYS;
+	printf("createDepthStencilState 3 : %x\n", this->device->CreateDepthStencilState(&depthStencilStateDesc, &nullStencilState));
+
+	this->context->OMSetDepthStencilState(nullStencilState, 0);
+
 	//--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 	//---------------------------------------------------------------------------ALPHA BLENDING---------------------------------------------------------------------------------------
 	//--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -386,7 +394,7 @@ void UD::InitD3D(){
 	blendStateDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_SRC_ALPHA;
 	blendStateDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_DEST_ALPHA;
 	blendStateDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-	blendStateDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL & (~D3D11_COLOR_WRITE_ENABLE_ALPHA);
+	blendStateDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 	
 
 	this->device->CreateBlendState(&blendStateDesc, &blendState);
@@ -396,7 +404,7 @@ void UD::InitD3D(){
 	//--/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\-- EXPERIMENTAL START
 
 	TargaFile file = {};
-	if (!TargaFile::open("../test_images/logo.tga", &file)) {
+	if (!TargaFile::open("../test_images/logo_chaotic.tga", &file)) {
 		printf("NIGAAAAAAAAAAAAAAAA\n");
 		return;
 	}
@@ -428,8 +436,15 @@ void UD::InitD3D(){
 	} else {
 		std::vector<uint32_t> temp_buffer(pic_area);																					//allocate space for the whole image data section
 		file.readImageData((uint8_t*)temp_buffer.data());																				//otherwise just read it into the buffer, which prolly doesn't
-		for (size_t i = 0; i < temp_buffer.size(); i++) {
-			*(uint32_t*)(&buffer[i*4]) = _byteswap_ulong(temp_buffer[i]);
+
+		for (size_t i = 0, yi = file.header.image_specification.height - 1, yo = 0; yo < file.header.image_specification.height; yi--, yo++) {
+			for (size_t x = 0; x < file.header.image_specification.width; x++, i++) {
+				uint8_t* units_here = (uint8_t*)&temp_buffer[yi*file.header.image_specification.width + x];
+				buffer[i * 4 + 0] = units_here[2];
+				buffer[i * 4 + 1] = units_here[1];
+				buffer[i * 4 + 2] = units_here[0];
+				buffer[i * 4 + 3] = units_here[3];
+			}
 		}
 
 		
@@ -535,7 +550,7 @@ void UD::SetPaintingStencilState(uint8_t stencil_level) {
 }
 
 void UD::SetNullStencilState() {
-	this->context->OMSetDepthStencilState(nullptr, 0);
+	this->context->OMSetDepthStencilState(nullStencilState, 0);
 }
 
 void UD::ClearStencilBuffer() {

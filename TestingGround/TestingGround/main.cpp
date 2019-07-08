@@ -9,7 +9,6 @@ UD* elUD = 0;
 
 std::vector<f3coord> vertexes = {
 
-
 	square(491, 476, 668 - 491, 530 - 476, 0),
 	square(695, 475, 865 - 695, 532 - 475, 0),
 
@@ -22,8 +21,7 @@ std::vector<f3coord> vertexes = {
 
 	square(847, 332, 1592 - 847, 681 - 332, 0),
 
-
-	square(855, 450, 200, 200, 0),
+	square(640, 220, 640, 640, 0),
 
 };
 
@@ -45,6 +43,7 @@ std::vector<f4color> colors = {
 
 
 	{0.0, 0.0, 0.0, 0.0},	{0.0, 0.0, 0.0, 0.0},	{0.0, 0.0, 0.0, 0.0},	{0.0, 0.0, 0.0, 0.0},
+
 };
 
 std::vector<f2coord> texels = {
@@ -58,6 +57,7 @@ std::vector<f2coord> texels = {
 	{0.0, 0.0}, {0.0, 0.0}, {0.0, 0.0}, {0.0, 0.0},
 
 	{0.0, 0.0}, {1.0, 0.0}, {0.0, 1.0}, {1.0, 1.0},
+
 };
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -97,11 +97,16 @@ int main() {
 	Sleep(1000);
 
 	elUD->ClearStencilBuffer();
-	elUD->SetRenderColorState();
 
 	elUD->UpdateVertexBuffer(vertexes);
 	elUD->UpdateColorsBuffer(colors);
 	elUD->UpdateTexelsBuffer(texels);
+
+
+
+
+
+	elUD->SetRenderColorState();
 
 	elUD->SetSubtractiveStencilState(1);
 	elUD->Draw(0, 4);
@@ -115,8 +120,10 @@ int main() {
 	elUD->SetPaintingStencilState(2);
 	elUD->Draw(20, 4);
 
+
 	elUD->SetRenderTextureState();
 	elUD->Draw(24, 4);
+
 
 
 	getchar();

@@ -396,18 +396,21 @@ void UD::InitD3D(){
 	//--/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\-- EXPERIMENTAL START
 
 	TargaFile file = {};
-	if (!TargaFile::open("../test_images/walkcat.tga", &file)) {
+	if (!TargaFile::open("../test_images/logo.tga", &file)) {
 		printf("NIGAAAAAAAAAAAAAAAA\n");
 		return;
 	}
-	
+
+	printf("origin: (%d, %d)\n", file.header.image_specification.x_origin, file.header.image_specification.y_origin);
+	printf("colormap type: %d\n", file.header.colormap_type);
+
 	size_t pic_area = file.header.image_specification.width * file.header.image_specification.height;									//make a temp variable for size cuz that shit's big
 
 	std::vector<uint8_t> buffer(pic_area * 4);																							//buffer to save the R8G8B8A8_UNORM to
 
 	if (file.header.image_specification.bpp != 32) {																					//if it's 32 bits (with alpha and everything)
 		if (file.header.image_specification.bpp == 24) {																				//if it's 24 bits,
-			std::vector<uint8_t> temp_buffer(file.header.image_specification.width* file.header.image_specification.height * 3);		//allocate space for the whole image data section
+			std::vector<uint8_t> temp_buffer(pic_area * 3);		//allocate space for the whole image data section
 			file.readImageData(temp_buffer.data());																						//read it whole
 			for (size_t i = 0, t = 0; i < temp_buffer.size(); i += 3, t += 4) {															//and for each pixel
 				buffer[t + 0] = temp_buffer[i + 2];																						//copy it over to the 32-bit
@@ -423,7 +426,13 @@ void UD::InitD3D(){
 			return;
 		}
 	} else {
-		file.readImageData(buffer.data());																								//otherwise just read it into the buffer, which prolly doesn't
+		std::vector<uint32_t> temp_buffer(pic_area);																					//allocate space for the whole image data section
+		file.readImageData((uint8_t*)temp_buffer.data());																				//otherwise just read it into the buffer, which prolly doesn't
+		for (size_t i = 0; i < temp_buffer.size(); i++) {
+			*(uint32_t*)(&buffer[i*4]) = _byteswap_ulong(temp_buffer[i]);
+		}
+
+		
 	}																																	//work cuz endianness, but I haven't tried it yet so fuck it lul
 
 

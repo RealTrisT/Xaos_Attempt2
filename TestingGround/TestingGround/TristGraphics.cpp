@@ -404,7 +404,7 @@ void UD::InitD3D(){
 	//--/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\----/\-- EXPERIMENTAL START
 
 	TargaFile file = {};
-	if (!TargaFile::open("../test_images/logo_chaotic.tga", &file)) {
+	if (!TargaFile::open("../test_images/splash_chaotic.tga", &file)) {
 		printf("NIGAAAAAAAAAAAAAAAA\n");
 		return;
 	}

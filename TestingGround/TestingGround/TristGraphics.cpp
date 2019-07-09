@@ -77,7 +77,7 @@ DWORD UD::windowFunc(UD* _this){
 
 void UD::SetWindowProc(LRESULT(CALLBACK *WindowProc_a)(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)){
 	this->WindowProc_p = WindowProc_a;
-	if(this->windInited)SetWindowLongPtr(this->hWnd, GWLP_WNDPROC, (LONG_PTR)&WindowProc_a);
+	if(this->windInited)SetWindowLongPtr(this->hWnd, GWLP_WNDPROC, (LONG_PTR)WindowProc_a);
 }
 
 void UD::SetWindowInitCallback (void(*callback_initedWindow_a )(UD*)){ callback_initedWindow  = callback_initedWindow_a ; }
@@ -601,7 +601,7 @@ const char* UD::shader_color = R"(
 
 	float4 PShader(float4 position : SV_POSITION, float4 color : COLOR) : SV_TARGET
 	{
-		return float4(color[0]*color[3], color[1]*color[3], color[2]*color[3], color[3]);   //TODO: actually implement alpha blending https://docs.microsoft.com/en-us/windows/desktop/direct3d11/d3d10-graphics-programming-guide-blend-state
+		return float4(color[0]*color[3], color[1]*color[3], color[2]*color[3], color[3]);
 	}
 )";
 

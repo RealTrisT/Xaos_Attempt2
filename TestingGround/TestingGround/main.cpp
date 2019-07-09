@@ -81,21 +81,21 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 
 
 int main() {
-
-	printf("%d\n\n\n", sizeof(f3coord));
-
 	elUD = new UD(1919, 1080);
+
 	elUD->SetWindowInitCallback([](UD* elUDp) -> void {
 		SetLayeredWindowAttributes(elUDp->hWnd, RGB(0, 0, 0), 0xFF, LWA_ALPHA);
 		MARGINS margs = { 0, (int)elUDp->width, 0, (int)elUDp->height };
 		DwmExtendFrameIntoClientArea(elUDp->hWnd, &margs);
 
+		SetWindowLong(elUDp->hWnd, GWL_EXSTYLE, GetWindowLong(elUDp->hWnd, GWL_EXSTYLE) | WS_EX_TRANSPARENT);
+
 		elUDp->InitD3D();
 	});
-	elUD->InitWindow(WindowProc);
 
-	Sleep(1000);
+	elUD->SetDirectxInitCallback([](UD* elUDp) -> void {elUDp->SetWindowProc(WindowProc);});
 
+	elUD->InitWindow();
 
 
 	elUD->UpdateVertexBuffer(vertexes);
@@ -104,6 +104,8 @@ int main() {
 
 	elUD->SetRenderTextureState();
 	elUD->Draw(24, 4);
+
+	elUD->PresentFrame();
 
 	/*elUD->SetRenderColorState();
 

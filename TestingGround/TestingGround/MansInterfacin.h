@@ -10,6 +10,10 @@ struct f4color { float r, g, b, a; };
 
 struct f2coord { float x, y; };
 
+__declspec(align(16)) struct colortexel {
+	f4color c; f2coord t;
+};
+
 __declspec(align(16)) struct f3coord { float x, y, z; };
 
 class MansInterfacin {		//just imagine big shak saying it, then it'll make sense, you can even add his "boom" at the end of it in your head for effect 
@@ -47,7 +51,7 @@ public:
 		void SetWindowInitCallback(void(*callback_initedWindow_a)(NativeWindowSystem*));												//this sets the callback for after the window is initiated
 	}native_window_system;
 
-	class GraphicsSystem { friend class UI;
+	class GraphicsSystem { friend class UI; friend int main();
 	public:
 		GraphicsSystem(NativeWindowSystem* native_window_system, void(*Callback_initedGraphics)(GraphicsSystem*) = 0);
 
@@ -101,18 +105,34 @@ public:
 			ResourceModifyFreq modfreq;
 			TextureFormat		format;
 
-			ID3D11Texture2D* the_texture;
-			ID3D11ShaderResourceView* the_texture_resourceview;
+			ID3D11Texture2D* d3d_obj;
+			ID3D11ShaderResourceView* d3d_obj_resourceview;
 		};
+		typedef size_t Texture2D_ID;
 
+		struct VertexBuffer {
+			friend class UI;
+			unsigned element_size;
+			unsigned buffer_size;
+			ID3D11Buffer* d3d_obj;
+			ResourceModifyFreq modfreq;
+		};
+		typedef size_t VertexBuffer_ID;
 
 		UI(GraphicsSystem* graphics_system);
-		Texture2D* createTexture2D(unsigned width, unsigned height, ResourceModifyFreq modfreq, Texture2D::TextureFormat format, uint8_t* init_buffer = 0);
-		void SetTexture(Texture2D* texture);
-		
-		GraphicsSystem* graphics_system;
-		std::vector<Texture2D> textures;
 
+		Texture2D_ID CreateTexture2D(unsigned width, unsigned height, ResourceModifyFreq modfreq, Texture2D::TextureFormat format, uint8_t* init_data = 0);
+		bool UpdateTexture2D(Texture2D_ID textureID, uint8_t* data);
+		void SetTexture(Texture2D_ID textureID);
+
+		Texture2D_ID CreateVertexBuffer(unsigned element_size, unsigned buffer_size, ResourceModifyFreq modfreq, uint8_t* int_data = 0);
+		bool UpdateVertexBuffer(Texture2D_ID bufferID, uint8_t* data);
+		void SetBuffers(Texture2D_ID* bufferIDs, uint32_t amount);
+
+
+		GraphicsSystem* graphics_system;
+		std::vector<Texture2D> textures = std::vector<Texture2D>();
+		std::vector<VertexBuffer> buffers = std::vector<VertexBuffer>();
 	}ui;
 public:
 

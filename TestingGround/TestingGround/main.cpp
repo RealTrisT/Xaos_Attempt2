@@ -51,27 +51,34 @@ int main() {
 
 	//std::vector<f4color> colors = { {0.0f, 0.0f, 0.0f, 0.0f},	{0.0f, 0.0f, 0.0f, 0.0f},	{0.0f, 0.0f, 0.0f, 0.0f},	{0.0f, 0.0f, 0.0f, 0.0f} };
 	//elUD->graphics_system.UpdateColorsBuffer(colors);
+	
+
 
 	TargaFile file = {};
-	TargaFile::open("../test_images/splash_chaotic.tga", &file);
-	std::vector<uint8_t> buffer(4 * file.header.image_specification.width * file.header.image_specification.height);
-	file.readIntoRGBA32(buffer.data());
+	TargaFile::open("../test_images/splash.tga", &file);
+	std::vector<uint8_t> splash(4 * file.header.image_specification.width * file.header.image_specification.height);
+	file.readIntoRGBA32(splash.data());
 	file.close();
 
 	std::vector<f3coord> vertexes = { square(640, 220, 640, 640, 0)	};
+	std::vector<f4color> colors = { {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0} };
 	std::vector<f2coord> texels = {	{0.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 1.0f} };
 
 	elUD->Intialize();
 
-	elUD->graphics_system.UpdateVertexBuffer(vertexes);
-	elUD->graphics_system.UpdateTexelsBuffer(texels);
+	MansInterfacin::UI::VertexBuffer_ID buffers[3] = {
+		elUD->ui.CreateVertexBuffer(sizeof(f3coord), vertexes.size(), MansInterfacin::UI::ResourceModifyFreq::NEVER, (uint8_t*)vertexes.data()),
+		elUD->ui.CreateVertexBuffer(sizeof(f4color), colors.size(),   MansInterfacin::UI::ResourceModifyFreq::NEVER, (uint8_t*)colors.data()),
+		elUD->ui.CreateVertexBuffer(sizeof(f2coord), texels.size(),   MansInterfacin::UI::ResourceModifyFreq::NEVER, (uint8_t*)texels.data())
+	};
+	elUD->ui.SetBuffers(buffers, 3);
 
-	auto texture = elUD->ui.createTexture2D(
+	auto texture = elUD->ui.CreateTexture2D(
 		file.header.image_specification.width, 
 		file.header.image_specification.height, 
-		MansInterfacin::UI::ResourceModifyFreq::NEVER, 
+		MansInterfacin::UI::ResourceModifyFreq::ALWAYS, 
 		MansInterfacin::UI::Texture2D::TextureFormat::RGBA32,
-		buffer.data()
+		splash.data()
 	);
 
 	elUD->ui.SetTexture(texture);
@@ -80,6 +87,9 @@ int main() {
 	elUD->graphics_system.Draw(4);
 
 	elUD->graphics_system.PresentFrame();
+
+
+
 
 
 

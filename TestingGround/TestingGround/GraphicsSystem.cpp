@@ -197,7 +197,7 @@ void MansInterfacin::GraphicsSystem::InitD3D() {
 	//---------------------------------------------------------------------------VERTEX BUFFER----------------------------------------------------------------------------------------
 	//--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-	unsigned int vstride = sizeof(f3coord);
+	/*unsigned int vstride = sizeof(f3coord);
 	unsigned int voffset = 0;
 	D3D11_BUFFER_DESC vbd = { 0 };
 	vbd.Usage = D3D11_USAGE_DYNAMIC;
@@ -229,7 +229,7 @@ void MansInterfacin::GraphicsSystem::InitD3D() {
 	unsigned int strides[3] = { vstride, cstride, tstride };
 	unsigned int offsets[3] = { voffset, coffset, toffset };
 
-	context->IASetVertexBuffers(0, 3, buffers, strides, offsets);
+	context->IASetVertexBuffers(0, 3, buffers, strides, offsets);*/
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
 

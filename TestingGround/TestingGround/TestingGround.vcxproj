@@ -123,18 +123,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Hyperion.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
-    </ClCompile>
+    <ClCompile Include="GraphicsSystem.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="TristGraphics.cpp" />
+    <ClCompile Include="MansInterfacin.cpp" />
+    <ClCompile Include="NativeWindowSystem.cpp" />
+    <ClCompile Include="Targa.cpp" />
+    <ClCompile Include="UI.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Hyperion.h">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
-    </ClInclude>
     <ClInclude Include="Targa.h" />
-    <ClInclude Include="TristGraphics.h" />
+    <ClInclude Include="MansInterfacin.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

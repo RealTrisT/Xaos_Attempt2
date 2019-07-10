@@ -13,27 +13,39 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Source Files\UI stuff">
+      <UniqueIdentifier>{5ebca151-1a35-432c-a71b-00a5e1ba45e8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\UI stuff">
+      <UniqueIdentifier>{3921dc96-970c-45bf-9c10-a97688dc22db}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Hyperion.cpp">
+    <ClCompile Include="MansInterfacin.cpp">
+      <Filter>Source Files\UI stuff</Filter>
+    </ClCompile>
+    <ClCompile Include="NativeWindowSystem.cpp">
+      <Filter>Source Files\UI stuff</Filter>
+    </ClCompile>
+    <ClCompile Include="GraphicsSystem.cpp">
+      <Filter>Source Files\UI stuff</Filter>
+    </ClCompile>
+    <ClCompile Include="Targa.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="TristGraphics.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="UI.cpp">
+      <Filter>Source Files\UI stuff</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="TristGraphics.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Hyperion.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Targa.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MansInterfacin.h">
+      <Filter>Header Files\UI stuff</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -146,8 +146,8 @@ void MansInterfacin::GraphicsSystem::InitD3D() {
 	this->context->IASetInputLayout(pLayout_color);
 
 	D3D11_INPUT_ELEMENT_DESC ied_texture[] = {
-		{"POSITION",	0, DXGI_FORMAT_R32G32B32_FLOAT,		0, 0,	D3D11_INPUT_PER_VERTEX_DATA, 0},
-		{"TEXCOORD",	0, DXGI_FORMAT_R32G32_FLOAT,		2, 0,	D3D11_INPUT_PER_VERTEX_DATA, 0}
+		{"POSITION",	0, DXGI_FORMAT_R32G32B32_FLOAT,		0, 0,						D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"TEXCOORD",	0, DXGI_FORMAT_R32G32_FLOAT,		1, offsetof(colortexel, t),	D3D11_INPUT_PER_VERTEX_DATA, 0}
 	};
 
 	success = this->device->CreateInputLayout(ied_texture, 2, VS_texture->GetBufferPointer(), VS_texture->GetBufferSize(), &pLayout_texture);
@@ -197,39 +197,8 @@ void MansInterfacin::GraphicsSystem::InitD3D() {
 	//---------------------------------------------------------------------------VERTEX BUFFER----------------------------------------------------------------------------------------
 	//--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-	/*unsigned int vstride = sizeof(f3coord);
-	unsigned int voffset = 0;
-	D3D11_BUFFER_DESC vbd = { 0 };
-	vbd.Usage = D3D11_USAGE_DYNAMIC;
-	vbd.ByteWidth = 200 * sizeof(f3coord);
-	vbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-	vbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	//this section no longer exists since I can now generate vertex buffers dynamically
 
-	unsigned int cstride = sizeof(f4color);
-	unsigned int coffset = 0;
-	D3D11_BUFFER_DESC cbd = { 0 };
-	cbd.Usage = D3D11_USAGE_DYNAMIC;
-	cbd.ByteWidth = 200 * sizeof(f4color);
-	cbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-	cbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-	unsigned int tstride = sizeof(f2coord);
-	unsigned int toffset = 0;
-	D3D11_BUFFER_DESC tbd = { 0 };
-	tbd.Usage = D3D11_USAGE_DYNAMIC;
-	tbd.ByteWidth = 200 * sizeof(f2coord);
-	tbd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-	tbd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-	device->CreateBuffer(&vbd, NULL, &pVertexBuffer);
-	device->CreateBuffer(&cbd, NULL, &pColorsBuffer);
-	device->CreateBuffer(&tbd, NULL, &pTexelsBuffer);
-
-	ID3D11Buffer* buffers[3] = { pVertexBuffer, pColorsBuffer, pTexelsBuffer };
-	unsigned int strides[3] = { vstride, cstride, tstride };
-	unsigned int offsets[3] = { voffset, coffset, toffset };
-
-	context->IASetVertexBuffers(0, 3, buffers, strides, offsets);*/
 	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
 

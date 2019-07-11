@@ -124,6 +124,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="GraphicsSystem.cpp" />
+    <ClCompile Include="Hyperion.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MansInterfacin.cpp" />
     <ClCompile Include="NativeWindowSystem.cpp" />
@@ -131,6 +132,7 @@
     <ClCompile Include="UI.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Hyperion.h" />
     <ClInclude Include="Targa.h" />
     <ClInclude Include="MansInterfacin.h" />
   </ItemGroup>

@@ -39,6 +39,9 @@
     <ClCompile Include="UI.cpp">
       <Filter>Source Files\UI stuff</Filter>
     </ClCompile>
+    <ClCompile Include="Hyperion.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Targa.h">
@@ -46,6 +49,9 @@
     </ClInclude>
     <ClInclude Include="MansInterfacin.h">
       <Filter>Header Files\UI stuff</Filter>
+    </ClInclude>
+    <ClInclude Include="Hyperion.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

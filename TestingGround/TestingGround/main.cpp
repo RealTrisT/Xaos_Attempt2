@@ -85,7 +85,7 @@ int main() {
 	WindowSystem::Window window = {};
 	
 	WindowSystem::WindowInfo wi = {};
-	wi.pos_x = 100; wi.pos_y = 10;
+	wi.pos_x = 0; wi.pos_y = 0;
 	wi.width = 1000; wi.height = 480;
 	
 	wi.background.background_is_texture = false;
@@ -93,7 +93,7 @@ int main() {
 	wi.background.color_info.color[1] =
 	wi.background.color_info.color[2] =
 	wi.background.color_info.color[3] =
-		{0.3, 0.8, 0.3, 0.8};
+		{0.3f, 0.8f, 0.3f, 0.8f};
 
 	wi.has_borders = true;
 	wi.borders.left   =
@@ -117,7 +117,7 @@ int main() {
 
 
 	TargaFile font = {};
-	if (!TargaFile::open("../test_images/consolas_ascii.tga", &font)) { printf("REEEEEEEEEEEEEe\n"); return 0; }
+	if (!TargaFile::open("../test_images/consolas_ascii_alpha.tga", &font)) { printf("REEEEEEEEEEEEEe\n"); return 0; }
 	std::vector<uint8_t> font_buffer = std::vector<uint8_t>(font.header.image_specification.width * font.header.image_specification.height * 4);
 	font.readIntoRGBA32(font_buffer.data());
 	auto font_texture = elUD->ui.CreateTexture2D(font.header.image_specification.width, font.header.image_specification.height, MansInterfacin::UI::ResourceModifyFreq::SOMETIMES, MansInterfacin::UI::Texture2D::TextureFormat::RGBA32, font_buffer.data());
@@ -125,7 +125,7 @@ int main() {
 	WindowSystem::AsciiFont ascii_font = {};
 	WindowSystem::AsciiFont::Create(&ascii_font, font_texture, 16, 29);
 	WindowSystem::AsciiText ascii_text = {};
-	WindowSystem::AsciiText::Create(&ascii_text, &ascii_font, (char*)"hello, this is I, autistic text with tits emoji ( . Y . ), thank you for stopping by!", 10, elUD);
+	WindowSystem::AsciiText::Create(&ascii_text, &ascii_font, (char*)"hello, this is I, autistic text with tits emoji ( . Y . ), thank you for stopping by!", 8, elUD);
 	ascii_text.Draw(elUD);
 
 

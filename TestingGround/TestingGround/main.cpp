@@ -2,6 +2,7 @@
 #include "Hyperion.h"
 
 #include "Targa.h"
+#include "TTF.h"
 
 #include <dwmapi.h>
 #pragma comment (lib, "Dwmapi.lib")
@@ -134,6 +135,13 @@ int main() {
 
 
 
+	TrueTypeFontFile ttf = {};
+	if (!TrueTypeFontFile::Open(&ttf, "../test_images/consola.ttf")) { puts("FUCK"); getchar(); return 0; }	
+	for (uint16_t i = 0; i < ttf.offs_subt.num_tables; i++) {
+		printf("%4.4s : 0x%X\n", ttf.tables_info[i].tag_c, ttf.tables_info[i].offset);
+	}
+	printf("GLYF table offset: %X\n", ttf.table_lookup[TABLE_TYPE_glyf].table_entry->offset);
+	ttf.close();
 
 
 

@@ -42,6 +42,9 @@
     <ClCompile Include="Hyperion.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="TTF.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Targa.h">
@@ -51,6 +54,12 @@
       <Filter>Header Files\UI stuff</Filter>
     </ClInclude>
     <ClInclude Include="Hyperion.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TTF.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Datatypes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

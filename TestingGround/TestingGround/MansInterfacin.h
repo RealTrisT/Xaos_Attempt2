@@ -3,18 +3,11 @@
 #include <Windows.h>
 #include <vector>
 
+#include "Datatypes.h"
+
 #include <d3d11.h>
 #pragma comment(lib, "d3d11.lib")
 
-struct f4color { float r, g, b, a; };
-
-struct f2coord { float x, y; };
-
-__declspec(align(16)) struct colortexel {
-	f4color c; f2coord t;
-};
-
-__declspec(align(16)) struct f3coord { float x, y, z; };
 
 class MansInterfacin {		//just imagine big shak saying it, then it'll make sense, you can even add his "boom" at the end of it in your head for effect 
 public:

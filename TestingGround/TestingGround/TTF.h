@@ -4,9 +4,15 @@
 #include <cstdint>
 #include <vector>
 
-//The first table in the TTF file
+#include "Datatypes.h"
+
+//fixed point number with 16 bits for integer and 16 for decimal
+typedef struct { uint16_t first, second; } Fixed;
+//Font Word, represents font units aka EM - which was orignally used in the press as a measure of printers, and is represented by the width of an upper case M
+typedef int16_t FWord;
 
 #pragma pack(push, 1) 
+//The first table in the TTF file
 struct OffsetSubtable {
 	//this is documented differently in windows' and apples' specifications.
 	//Apple says it's 'scaler type', Windows says it's 'sfntVersion'
@@ -21,15 +27,8 @@ struct OffsetSubtable {
 	uint16_t range_shift;
 
 	//set correct endianness, since ttf fonts are big endian
-	void fix_endian() {
-		this->trash				= _byteswap_ulong (this->trash);
-		this->num_tables		= _byteswap_ushort(this->num_tables);
-		this->search_range		= _byteswap_ushort(this->search_range);
-		this->query_selectors	= _byteswap_ushort(this->query_selectors);
-		this->range_shift		= _byteswap_ushort(this->range_shift);
-	}
+	void fix_endian();
 };
-#pragma pack(pop)
 
 //Directory table
 struct DirectoryTableEntry {
@@ -43,114 +42,106 @@ struct DirectoryTableEntry {
 	uint32_t length;
 
 	//set correct endianness, since ttf fonts are big endian
-	void fix_endian() {
-		this->checksum	= _byteswap_ulong(this->checksum);
-		this->offset	= _byteswap_ulong(this->offset);
-		this->length	= _byteswap_ulong(this->length);
-	}
+	void fix_endian();
 };
 
-enum TableTypes {
-	TABLE_TYPE_UNKNOWN,
-	TABLE_TYPE_EBSC,	TABLE_TYPE_OS_2,	TABLE_TYPE_Zapf,
-	TABLE_TYPE_acnt,	TABLE_TYPE_ankr,	TABLE_TYPE_avar,
-	TABLE_TYPE_bdat,	TABLE_TYPE_bhed,	TABLE_TYPE_bloc,
-	TABLE_TYPE_bsln,	TABLE_TYPE_cmap,	TABLE_TYPE_cvar,
-	TABLE_TYPE_cvt,		TABLE_TYPE_fdsc,	TABLE_TYPE_feat,
-	TABLE_TYPE_fmtx,	TABLE_TYPE_fond,	TABLE_TYPE_fpgm,
-	TABLE_TYPE_fvar,	TABLE_TYPE_gasp,	TABLE_TYPE_gcid,
-	TABLE_TYPE_glyf,	TABLE_TYPE_gvar,	TABLE_TYPE_hdmx,
-	TABLE_TYPE_head,	TABLE_TYPE_hhea,	TABLE_TYPE_htmx,
-	TABLE_TYPE_just,	TABLE_TYPE_kern,	TABLE_TYPE_kerx,
-	TABLE_TYPE_lcar,	TABLE_TYPE_loca,	TABLE_TYPE_ltag,
-	TABLE_TYPE_maxp,	TABLE_TYPE_meta,	TABLE_TYPE_mort,
-	TABLE_TYPE_morx,	TABLE_TYPE_name,	TABLE_TYPE_opbd,
-	TABLE_TYPE_post,	TABLE_TYPE_prep,	TABLE_TYPE_prop,
-	TABLE_TYPE_sbix,	TABLE_TYPE_trak,	TABLE_TYPE_vhea,
-	TABLE_TYPE_vmtx,	TABLE_TYPE_xref,
+struct HeadTable {
+	Fixed	 version;
+	Fixed	 font_revision;
+	uint32_t checksum_adjustment;
+	uint32_t magic;
+	uint16_t flags;
+	uint16_t units_per_EM;
+	int64_t  date_created;
+	int64_t  date_modified;
+	FWord    x_min;
+	FWord    y_min;
+	FWord    x_max;
+	FWord    y_max;
+	uint16_t mac_style;
+	uint16_t lowest_rec_ppEM;
+	int16_t  font_direction_hint;
+	int16_t  index_to_loc_format;
+	int16_t  glyph_data_format;
+
+	void fix_endian();
 };
 
-uint32_t TagValues[] = {
-	0x00000000 /*UNKNOWN*/,
-	0x45425343 /*EBSC*/,	0x4F532F32 /*OS/2*/,	0x5A617066 /*Zapf*/,
-	0x61636E74 /*acnt*/,	0x616E6B72 /*ankr*/,	0x61766172 /*avar*/,
-	0x62646174 /*bdat*/,	0x62686564 /*bhed*/,	0x626C6F63 /*bloc*/,
-	0x62736C6E /*bsln*/,	0x636D6170 /*cmap*/,	0x63766172 /*cvar*/,
-	0x63767400 /* cvt*/,	0x66647363 /*fdsc*/,	0x66656174 /*feat*/,
-	0x666D7478 /*fmtx*/,	0x666F6E64 /*fond*/,	0x6670676D /*fpgm*/,
-	0x66766172 /*fvar*/,	0x67617370 /*gasp*/,	0x67636964 /*gcid*/,
-	0x676C7966 /*glyf*/,	0x67766172 /*gvar*/,	0x68646D78 /*hdmx*/,
-	0x68656164 /*head*/,	0x68686561 /*hhea*/,	0x68746D78 /*htmx*/,
-	0x6A757374 /*just*/,	0x6B65726E /*kern*/,	0x6B657278 /*kerx*/,
-	0x6C636172 /*lcar*/,	0x6C6F6361 /*loca*/,	0x6C746167 /*ltag*/,
-	0x6D617870 /*maxp*/,	0x6D657461 /*meta*/,	0x6D6F7274 /*mort*/,
-	0x6D6F7278 /*morx*/,	0x6E616D65 /*name*/,	0x6F706264 /*opbd*/,
-	0x706F7374 /*post*/,	0x70726570 /*prep*/,	0x70726F70 /*prop*/,
-	0x73626978 /*sbix*/,	0x7472616B /*trak*/,	0x76686561 /*vhea*/,
-	0x766D7478 /*vmtx*/,	0x78726566 /*xref*/,
+struct MaxpTable {	//TODO: implement version 1.0
+	Fixed version;
+	uint16_t num_glyphs;
+
+	void fix_endian();
 };
+
+struct LocaEntryShort {
+	uint16_t offset;
+	void fix_endian() { this->offset = _byteswap_ushort(this->offset); }
+};
+
+struct LocaEntryLong {
+	uint32_t offset;
+	void fix_endian() { this->offset = _byteswap_ulong(this->offset); }
+};
+
+
+
+struct GlyfEntry {
+	typedef uint8_t VariableGlyfData;
+	struct GlyfData {
+		struct GlyfCoords {int16_t x, y; bool on_curve;};
+		std::vector<GlyfCoords> coords;
+		std::vector<uint16_t> skips;
+	};
+	
+
+	int16_t num_contours;
+	int16_t x_min;
+	int16_t y_min;
+	int16_t x_max;
+	int16_t y_max;
+	VariableGlyfData simple_data[0];
+
+	void fix_endian();
+
+
+	bool getSimpleCoords(GlyfData& vec);
+
+};
+
+#pragma pack(pop)
+
+
+void Nozero(const std::vector<f2coord>& coords, const std::vector<uint16_t>& skips, uint8_t(*result)[4], size_t width, size_t height);
 
 struct TrueTypeFontFile {
+	enum TableTypes {
+		FONT_TABLE_UNKNOWN,
+		FONT_TABLE_EBSC, FONT_TABLE_OS_2, FONT_TABLE_Zapf,
+		FONT_TABLE_acnt, FONT_TABLE_ankr, FONT_TABLE_avar,
+		FONT_TABLE_bdat, FONT_TABLE_bhed, FONT_TABLE_bloc,
+		FONT_TABLE_bsln, FONT_TABLE_cmap, FONT_TABLE_cvar,
+		FONT_TABLE_cvt,  FONT_TABLE_fdsc, FONT_TABLE_feat,
+		FONT_TABLE_fmtx, FONT_TABLE_fond, FONT_TABLE_fpgm,
+		FONT_TABLE_fvar, FONT_TABLE_gasp, FONT_TABLE_gcid,
+		FONT_TABLE_glyf, FONT_TABLE_gvar, FONT_TABLE_hdmx,
+		FONT_TABLE_head, FONT_TABLE_hhea, FONT_TABLE_htmx,
+		FONT_TABLE_just, FONT_TABLE_kern, FONT_TABLE_kerx,
+		FONT_TABLE_lcar, FONT_TABLE_loca, FONT_TABLE_ltag,
+		FONT_TABLE_maxp, FONT_TABLE_meta, FONT_TABLE_mort,
+		FONT_TABLE_morx, FONT_TABLE_name, FONT_TABLE_opbd,
+		FONT_TABLE_post, FONT_TABLE_prep, FONT_TABLE_prop,
+		FONT_TABLE_sbix, FONT_TABLE_trak, FONT_TABLE_vhea,
+		FONT_TABLE_vmtx, FONT_TABLE_xref,
+	};
 
 	struct LookupEntry { DirectoryTableEntry* table_entry; void* table_data; };
 
 
-	static bool Open(TrueTypeFontFile* instance, const char* path) {
-		#define this instance
-		
-		//number of tables
-		uint16_t nt = 0;
-		
-		//if can't open file, fail. pretty obvious
-		if (fopen_s(&this->file, path, "rb")) goto fail;
-		
-		//could not read the offset subtable
-		if (fread(&this->offs_subt, sizeof(OffsetSubtable), 1, this->file) != 1) goto fail_afteropen;
+	static bool Open(TrueTypeFontFile* instance, const char* path);
+	void close();
 
-		//reverse endianness, these are big endian by default
-		this->offs_subt.fix_endian();
-
-		//save nt in a smaller variable just for convenience
-		nt = this->offs_subt.num_tables;
-
-		//did not have all the required subtables, which are 9, as can be read in https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6.html#Overview
-		if (nt < 9) goto fail_afteropen;
-
-		//initialize the vector (basically just using it as a buffer) - this is good because no surprise realocations to mess with our pointers
-		this->tables_info = std::vector<DirectoryTableEntry>(this->offs_subt.num_tables);
-
-		//attempt to read the tables' information
-		if (fread(this->tables_info.data(), sizeof(DirectoryTableEntry), nt, this->file) != nt)goto fail_afteropen;
-
-		//fix all the endianness stuff, and fill in the lookup table
-		for (uint16_t i = 0, current_table_tag = 0; i < nt; i++) {
-			//first, fix the endianness
-			this->tables_info[i].fix_endian();
-			//temp variable for little endian file tag
-			uint32_t fixed_tag = _byteswap_ulong(this->tables_info[i].tag_i);
-			//since it's in order, look through all the tags until we find the one that isn't smaller than the current one we got
-			for (; TagValues[current_table_tag] < fixed_tag; current_table_tag++);
-			//now if it's equal, then that means we found our table
-			if (TagValues[current_table_tag] == fixed_tag)
-				//and that we need to put it's pointer on the lookup table
-				this->table_lookup[current_table_tag].table_entry = &this->tables_info[i];
-				//otherwise just ignore the table completely since we don't support it (kinda bad but it's my code so I can just make support for it if I wanna)
-				//plus, the user can just manually walkthrough the directory table, and then also manually read it into memory. Fuck the user lmao.
-		}
-		
-		//TODO: fail if not all the required tables are there, but that seems kinda lame rn
-
-		//for now do it
-		return true;
-
-		fail_afteropen:
-			fclose(this->file);
-		fail:
-			return false;
-		#undef this
-	}
-
-	void close() { fclose(this->file); }
+	void* loadTable(TableTypes type);
 
 
 	FILE* file;
@@ -158,4 +149,6 @@ struct TrueTypeFontFile {
 	OffsetSubtable offs_subt;
 	std::vector<DirectoryTableEntry> tables_info;
 	LookupEntry table_lookup[48];
+
+	static const uint32_t TagValues[48];
 };

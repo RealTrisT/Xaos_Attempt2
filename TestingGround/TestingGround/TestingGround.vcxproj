@@ -133,6 +133,7 @@
     <ClCompile Include="UI.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Datatypes.h" />
     <ClInclude Include="Hyperion.h" />
     <ClInclude Include="Targa.h" />
     <ClInclude Include="MansInterfacin.h" />

@@ -145,6 +145,67 @@ const uint32_t TrueTypeFontFile::TagValues[] = {
 
 
 void Nozero(const std::vector<f2coord>& coords, const std::vector<uint16_t>& skips, uint8_t (*result)[4], size_t width, size_t height){
+	//line segment
+	struct line {
+		//the 2 points that constitute the line segment
+		f2coord p[2];
+		//whether or not the line is going down (so if the y of the first point is > than the y of the second)
+		bool down;
+
+		//equation data
+		struct {
+			//whether or not it's vertical, since if that was the case the equation would be undefined
+			bool vertical;
+			//a union, since we're only gonna be using one of the 2, no need for wasting space
+			union {
+				//variables of the equation
+				struct {
+					float m;
+					float b;
+				};
+				//the x in cas it's vertical. This can already be taken from one of the points, but it's not a waste of space either sine it's a union, so just for convenience
+				float x;
+			};
+		}eq;
+	};
+
+	/////////////////////////////////////// Start Of Code
+
+	//line vector
+	std::vector<line> lines(coords.size() - skips.size());
+
+	//so first we establish a vector with all of the line data, for every line
+	
+	size_t li = 0;
+
+
+	for (size_t i = 0, si = 0; i < coords.size() - 1; i++) {
+
+		//if this point is a skip, don't add it as a line
+		if (si != skips.size() && i == skips[si]) { si++; continue; }
+
+		//build the object
+		lines[li].p[0] = coords[i + 0];
+		lines[li].p[1] = coords[i + 1];
+		lines[li].down = coords[i + 0].y < coords[i + 1].y;
+
+		if (lines[li].p[0].x == lines[li].p[1].x) {
+			lines[li].eq.vertical = true;
+			lines[li].eq.x = lines[li].p[0].x;
+		} else {
+			lines[li].eq.m = (lines[li].p[0].y - lines[li].p[1].y) / (lines[li].p[0].x - lines[li].p[1].x);
+			lines[li].eq.b = lines[li].eq.m * (-lines[li].p[0].x) + lines[li].p[0].y;
+		}li++;//increment line index
+
+	}
+
+	//////////////////////////////// Filling the segments array with info regarding the lines
+
+	//current size of the line array
+	size_t lines_curr_size = 0;
+	//line array
+	std::vector<line> lines_current(lines.size());
+	//which will have a maximum capacity of
 
 	//now for every row
 	for (size_t y = 0; y < height; y++) {
@@ -152,94 +213,64 @@ void Nozero(const std::vector<f2coord>& coords, const std::vector<uint16_t>& ski
 		//y position, which is going to be the middle of the pixel (which is a square)
 		float y_pix_center = float(y) + 0.5f;
 
-		//line segment
-		struct line {
-			//the 2 points that constitute the line segment
-			f2coord p[2];
-			//whether or not the line is going down (so if the y of the first point is > than the y of the second)
-			bool down;
-
-			//equation data
-			struct {
-				//whether or not it's vertical, since if that was the case the equation would be undefined
-				bool vertical;
-				//a union, since we're only gonna be using one of the 2, no need for wasting space
-				union {
-					//variables of the equation
-					struct {
-						float m;
-						float b;
-					};
-					//the x in cas it's vertical. This can already be taken from one of the points, but it's not a waste of space either sine it's a union, so just for convenience
-					float x;
-				};
-			}eq;
-		};
-
-		//vector for the lines the current y value might intersect with
-		std::vector<line> lines;
-		
-		//loop to fill the vector
-		for (size_t i = 0, si = 0; i < coords.size()-1; i++) {
-
-			if (si != skips.size() && i == skips[si]) { si++; continue; }
-
-			//variable for whether or not the segment is going down
-			bool down;
-			if (coords[i + 0].y <= y_pix_center && coords[i + 1].y >= y_pix_center) {
-				//if the current y is between the 2 points of this line and the first point is bellow the second
-				down = false;
-			} else if (coords[i + 0].y >= y_pix_center && coords[i + 1].y <= y_pix_center) {
-				//if the current y is between the 2 points of this line and the fist point is above the second
-				down = true;
-			} else continue;//if neither, go on to the next segment
-
-			//object to be added into the vector
-			line cl = {};
-			cl.p[0] = coords[i + 0];
-			cl.p[1] = coords[i + 1];
-			cl.down = down;
-
-			if (cl.p[0].x == cl.p[1].x) {
-				cl.eq.vertical = true;
-				cl.eq.x = cl.p[0].x;
-			} else {
-				cl.eq.m = (cl.p[0].y - cl.p[1].y) / (cl.p[0].x - cl.p[1].x);
-				cl.eq.b = cl.eq.m * (-cl.p[0].x) + cl.p[0].y;
-			}
-
-			//do it
-			lines.push_back(cl);
+		//reset the size of our line array
+		lines_curr_size = 0;
+		//and add all the lines that apply to our current Y value
+		for (auto& line : lines) {
+			if (
+				(line.p[0].y <= y_pix_center && line.p[1].y >= y_pix_center) 
+				||
+				(line.p[0].y >= y_pix_center && line.p[1].y <= y_pix_center)
+			)
+			lines_current[lines_curr_size++] = line;
 		}
+		
+
+		//now this is the fun part. we have the lines_current array, which will be overridden for every y axis
+		//this is because we don't want to compare every line in the geometry every single pixel generally speaking,
+		//so we exclude all the ones that are not part of our y axis from being compared to the points
+		
+		//and because we will be doing a horizontal scan, it's also useless to keep in that array the lines that are past us
+		//but that's a problem, because removing stuff from arrays is a pain in the ass, since it often means that you have to
+		//copy all the following memory backwards, in order to occupy the vaccant position. In this case though, we only use 
+		//the array once, so what I decided to do is override the "deleted" element with the one in the start of the array, and
+		//next time the array is iterated, we start at element 1 instead of 0, in order not to take the "deleted" one into account
+		//this is ok since we don't care for order in this particular case.
+
+		int processed = 0;
 
 		//now for each of the pixels in the row
-		for (size_t x = 0, touchy = 0; x < width; x++) {
+		int touchy = 0;
+		for (size_t x = 0, line_starters = 0; x < width; x++) {
 
 			float x_pix_center = float(x) + 0.5f;
 
-			for (size_t i = 0; i < lines.size(); i++) { 
-				line cl = lines[i];
+			for (size_t i = line_starters; i < lines_curr_size && line_starters < lines_curr_size; i++) {
+				line& cl = lines_current[i];
 				
 				//if we have passed one of the segments, remove it from the vector and increment/decrement the state appropriately
-				if (x_pix_center < cl.p[0].x && x_pix_center < cl.p[1].x) {
-					continue;
-				}else if (
+				if (x_pix_center < cl.p[0].x && x_pix_center < cl.p[1].x)continue; 
+
+				if (
 					(x_pix_center > cl.p[0].x && x_pix_center > cl.p[1].x)
 					||
 					(cl.eq.vertical && x_pix_center >= cl.eq.x)
 					||
 					(x_pix_center > ((y_pix_center - cl.eq.b) / cl.eq.m))
 				) {
-					lines.erase(lines.begin() + i--);
 					touchy += cl.down ? -1 : 1;
+
+					//if the one we want to delete is the "first", then we just increment the index of the line_starters and
+					//the real array index. Otherwise we just don't increase the real index so we stay in the same place, which
+					//wil have a new element there
+					if (line_starters == i)	line_starters++;
+					else					lines_current[i--] = lines_current[line_starters++];
 				}
 			}
 
-			//and so just set the pixel acording to the current state
-			result[y * width + x][3] = touchy?0xFF:0;
+			result[y * width + x][3] = (touchy)?0xFF:0;
 		}
 	}
-	
 }
 
 enum GlyfFlags {

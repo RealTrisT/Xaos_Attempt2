@@ -67,7 +67,7 @@ int main() {
 
 	MansInterfacin::UI::VertexBuffer_ID buffers[2] = {
 		elUD->ui.CreateVertexBuffer(sizeof(f3coord),	vertexes.size(),	MansInterfacin::UI::ResourceModifyFreq::SOMETIMES, (uint8_t*)vertexes.data() ),
-		elUD->ui.CreateVertexBuffer(sizeof(colortexel), colortexs.size(),   MansInterfacin::UI::ResourceModifyFreq::NEVER, (uint8_t*)colortexs.data()),
+		elUD->ui.CreateVertexBuffer(sizeof(colortexel), colortexs.size(),   MansInterfacin::UI::ResourceModifyFreq::SOMETIMES, (uint8_t*)colortexs.data()),
 	};
 	elUD->ui.SetBuffers(buffers, 2);
 
@@ -236,7 +236,7 @@ int main() {
 
 	uint8_t* glyf_table = (uint8_t*)ttf.loadTable(TrueTypeFontFile::FONT_TABLE_glyf);
 
-	GlyfEntry* glyf = (GlyfEntry*)(glyf_table + loca[0].offset);
+	GlyfEntry* glyf = (GlyfEntry*)(glyf_table + loca[4].offset);
 	glyf->fix_endian();
 
 	GlyfEntry::GlyfData data_glyf; 
@@ -275,18 +275,21 @@ int main() {
 
 	//for each contour
 	for (auto point : data_glyf.coords) {
-		whole[index++] = {float((point.x /*- glyf->x_min*/)), float((point.y /*- glyf->y_min*/))};
+		whole[index++] = {float((point.x - glyf->x_min)), float((point.y - glyf->y_min))};
 	}
 
 	std::vector<uint8_t[4]> endresult(width* height);
-	for (auto each : endresult) *(uint32_t*)each = 0xFFFFFFFF;
+	for (auto each : endresult) *(uint32_t*)each = 0x00FFFFFF;
 	Nozero(whole, data_glyf.skips, endresult.data(), width, height);
 	
 	auto tex = elUD->ui.CreateTexture2D(width, height, MansInterfacin::UI::ResourceModifyFreq::SOMETIMES, MansInterfacin::UI::Texture2D::TextureFormat::RGBA32, (uint8_t*)endresult.data());
 
 	vertexes[0].x += 640;	vertexes[1].x += 640;	vertexes[2].x += 640;	vertexes[3].x += 640;
+	colortexs[0].t = { 0.0, 1.0 }; colortexs[1].t = { 1.0, 1.0 }; colortexs[2].t = { 0.0, 0.0 }; colortexs[3].t = { 1.0, 0.0 };
 
 	elUD->ui.UpdateVertexBuffer(buffers[0], (uint8_t*)vertexes.data());
+	elUD->ui.UpdateVertexBuffer(buffers[1], (uint8_t*)colortexs.data());
+
 	elUD->ui.SetBuffers(buffers, 2);
 	elUD->ui.SetTexture(tex);
 	elUD->graphics_system.Draw(4);

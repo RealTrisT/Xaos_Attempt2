@@ -158,7 +158,7 @@ void MansInterfacin::GraphicsSystem::InitD3D() {
 	//------------------------------------------------------------------------------TEXTURING-----------------------------------------------------------------------------------------
 	//--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 	D3D11_SAMPLER_DESC sampler_description = {};
-	sampler_description.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	sampler_description.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;//D3D11_FILTER_MIN_MAG_MIP_LINEAR;
 	sampler_description.AddressU =
 		sampler_description.AddressV =
 		sampler_description.AddressW =

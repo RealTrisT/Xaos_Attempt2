@@ -229,13 +229,16 @@ int main() {
 	auto tex = elUD->ui.Create2DTexture(width, height, MansInterfacin::UI::ResourceModifyFreq::SOMETIMES, MansInterfacin::UI::Texture2D::TextureFormat::A8, (uint8_t*)endresult.data());
 
 	vertexes[0].x += 640;	vertexes[1].x += 640;	vertexes[2].x += 640;	vertexes[3].x += 640;
-	colortexs[0].t = { 0.0, 1.0 }; colortexs[1].t = { 1.0, 1.0 }; colortexs[2].t = { 0.0, 0.0 }; colortexs[3].t = { 1.0, 0.0 };
+	colortexs[0] = { {1, 0, 0, 1}, { 0.0, 1.0 } }; colortexs[1] = { {0, 1, 0, 1}, { 1.0, 1.0 } }; colortexs[2] = { {0, 0, 1, 1}, { 0.0, 0.0 } }; colortexs[3] = { {1, 1, 0, 1}, { 1.0, 0.0 } };
 
+	
 	elUD->ui.UpdateVertexBuffer(buffers[0], (uint8_t*)vertexes.data());
 	elUD->ui.UpdateVertexBuffer(buffers[1], (uint8_t*)colortexs.data());
 
 	elUD->ui.SetVertexBuffers(buffers, 2);
 	elUD->ui.Set2DTexture(tex);
+
+	elUD->graphics_system.SetRenderFontState();
 	elUD->graphics_system.Draw(4);
 	elUD->graphics_system.PresentFrame();
 	

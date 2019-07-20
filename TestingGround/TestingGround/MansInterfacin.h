@@ -54,13 +54,11 @@ public:
 		void InitD3D();				            // sets up and initializes Direct3D
 		void TermD3D();							// closes Direct3D and releases memory
 
-		void UpdateVertexBuffer(const std::vector<f3coord>& vertex_array);
-		void UpdateColorsBuffer(const std::vector<f4color>& colors_array);
-		void UpdateTexelsBuffer(const std::vector<f2coord>& coords_array);
 		void SetTopology(Topologies topology);
 
 		void SetRenderColorState();
 		void SetRenderTextureState();
+		void SetRenderFontState();
 
 		void SetSubtractiveStencilState(uint8_t stencil_level);
 		void SetPaintingStencilState(uint8_t stencil_level);
@@ -83,6 +81,7 @@ public:
 
 		static const char* shader_color;
 		static const char* shader_texture;
+		static const char* shader_font;
 	}graphics_system;
 
 

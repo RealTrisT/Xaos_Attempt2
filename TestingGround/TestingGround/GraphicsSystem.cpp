@@ -26,9 +26,6 @@ ID3D11DepthStencilState* nullStencilState;
 ID3D11BlendState* blendState;
 
 //_____________________________________________________________VERTEX&COLOR BUFFERS
-ID3D11Buffer* pVertexBuffer;// the vertex buffer
-ID3D11Buffer* pColorsBuffer;// the colors buffer
-ID3D11Buffer* pTexelsBuffer;// the texels buffer
 
 //_____________________________________________________________SHADERS
 ID3D11VertexShader* pVS_color;    // the vertex shader for color
@@ -38,6 +35,10 @@ ID3D11InputLayout* pLayout_color; // the input layout for color
 ID3D11VertexShader* pVS_texture;    // the vertex shader for textures
 ID3D11PixelShader* pPS_texture;     // the pixel shader for textures
 ID3D11InputLayout* pLayout_texture; // the input layout for textures
+
+ID3D11VertexShader* pVS_font;    // the vertex shader for fonts
+ID3D11PixelShader* pPS_font;     // the pixel shader for fonts
+ID3D11InputLayout* pLayout_font; // the input layout for fonts
 
 ID3D11Buffer* contextstantBuffer = 0; // constant buffer ( where the projection matrix is placed )
 
@@ -124,11 +125,17 @@ void MansInterfacin::GraphicsSystem::InitD3D() {
 
 	ID3D10Blob* VS_texture, * PS_texture;
 	hr = D3DCompile(GraphicsSystem::shader_texture, strlen(GraphicsSystem::shader_texture) + 1, "VS", 0, 0, "VShader", "vs_4_0", 0, 0, &VS_texture, 0);
-	printf("compiling texture vertex shade: %X\n", hr);
 	hr = D3DCompile(GraphicsSystem::shader_texture, strlen(GraphicsSystem::shader_texture) + 1, "PS", 0, 0, "PShader", "ps_4_0", 0, 0, &PS_texture, 0);
-	printf("compiling texture pixel shade: %X\n", hr);
 	device->CreateVertexShader(VS_texture->GetBufferPointer(), VS_texture->GetBufferSize(), NULL, &pVS_texture);
 	device->CreatePixelShader(PS_texture->GetBufferPointer(), PS_texture->GetBufferSize(), NULL, &pPS_texture);
+
+	ID3D10Blob* VS_font, * PS_font;
+	hr = D3DCompile(GraphicsSystem::shader_font, strlen(GraphicsSystem::shader_font) + 1, "VS", 0, 0, "VShader", "vs_4_0", 0, 0, &VS_font, 0);
+	printf("compiling font vertex shader: %X\n", hr);
+	hr = D3DCompile(GraphicsSystem::shader_font, strlen(GraphicsSystem::shader_font) + 1, "PS", 0, 0, "PShader", "ps_4_0", 0, 0, &PS_font, 0);
+	printf("compiling font pixel shader: %X\n", hr);
+	device->CreateVertexShader(VS_font->GetBufferPointer(), VS_font->GetBufferSize(), NULL, &pVS_font);
+	device->CreatePixelShader(PS_font->GetBufferPointer(), PS_font->GetBufferSize(), NULL, &pPS_font);
 
 	context->PSSetShader(pPS_color, 0, 0);
 	context->VSSetShader(pVS_color, 0, 0);
@@ -153,6 +160,15 @@ void MansInterfacin::GraphicsSystem::InitD3D() {
 	success = this->device->CreateInputLayout(ied_texture, 2, VS_texture->GetBufferPointer(), VS_texture->GetBufferSize(), &pLayout_texture);
 	printf("creating input layout for texture shaders: %X\n", hr);
 	//this->context->IASetInputLayout(pLayout_texture);
+
+	D3D11_INPUT_ELEMENT_DESC ied_font[] = {
+		{"POSITION",	0, DXGI_FORMAT_R32G32B32_FLOAT,		0, 0,						D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"COLOR",		0, DXGI_FORMAT_R32G32B32A32_FLOAT,	1, 0,						D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"TEXCOORD",	0, DXGI_FORMAT_R32G32_FLOAT,		1, offsetof(colortexel, t),	D3D11_INPUT_PER_VERTEX_DATA, 0}
+	};
+
+	success = this->device->CreateInputLayout(ied_font, 3, VS_font->GetBufferPointer(), VS_font->GetBufferSize(), &pLayout_font);
+	printf("CreateInputLayout: %s\n", (success == S_OK) ? "success" : "failed");
 
 	//--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 	//------------------------------------------------------------------------------TEXTURING-----------------------------------------------------------------------------------------
@@ -292,7 +308,6 @@ void MansInterfacin::GraphicsSystem::InitD3D() {
 }
 
 void MansInterfacin::GraphicsSystem::TermD3D(void) {
-	pVertexBuffer->Release();
 	contextstantBuffer->Release();
 	pVS_color->Release();
 	pPS_color->Release();
@@ -300,27 +315,6 @@ void MansInterfacin::GraphicsSystem::TermD3D(void) {
 	this->backbuffer->Release();
 	this->device->Release();
 	this->context->Release();
-}
-
-void MansInterfacin::GraphicsSystem::UpdateVertexBuffer(const std::vector<f3coord>& vertex_array) {
-	D3D11_MAPPED_SUBRESOURCE ms;
-	if (FAILED(this->context->Map(pVertexBuffer, NULL, D3D11_MAP_WRITE_DISCARD, NULL, &ms))) { puts("failed to map"); return; }
-	memcpy(ms.pData, vertex_array.data(), vertex_array.size() * sizeof(f3coord));
-	this->context->Unmap(pVertexBuffer, NULL);
-}
-
-void MansInterfacin::GraphicsSystem::UpdateColorsBuffer(const std::vector<f4color>& colors_array) {
-	D3D11_MAPPED_SUBRESOURCE ms;
-	if (FAILED(this->context->Map(pColorsBuffer, NULL, D3D11_MAP_WRITE_DISCARD, NULL, &ms))) { puts("failed to map"); return; }
-	memcpy(ms.pData, colors_array.data(), colors_array.size() * sizeof(f4color));
-	this->context->Unmap(pColorsBuffer, NULL);
-}
-
-void MansInterfacin::GraphicsSystem::UpdateTexelsBuffer(const std::vector<f2coord>& coords_array) {
-	D3D11_MAPPED_SUBRESOURCE ms;
-	if (FAILED(this->context->Map(pTexelsBuffer, NULL, D3D11_MAP_WRITE_DISCARD, NULL, &ms))) { puts("failed to map"); return; }
-	memcpy(ms.pData, coords_array.data(), coords_array.size() * sizeof(f2coord));
-	this->context->Unmap(pTexelsBuffer, NULL);
 }
 
 void MansInterfacin::GraphicsSystem::SetTopology(Topologies topology){
@@ -336,6 +330,12 @@ void MansInterfacin::GraphicsSystem::SetRenderTextureState() {
 	context->PSSetShader(pPS_texture, 0, 0);
 	context->VSSetShader(pVS_texture, 0, 0);
 	this->context->IASetInputLayout(pLayout_texture);
+}
+
+void MansInterfacin::GraphicsSystem::SetRenderFontState(){
+	context->PSSetShader(pPS_font, 0, 0);
+	context->VSSetShader(pVS_font, 0, 0);
+	this->context->IASetInputLayout(pLayout_font);
 }
 
 void MansInterfacin::GraphicsSystem::SetSubtractiveStencilState(uint8_t stencil_level) {
@@ -422,5 +422,40 @@ const char* MansInterfacin::GraphicsSystem::shader_texture = R"(
 	{
 		float4 color = objTexture.Sample(objSamplerState, texcoord);
 		return float4(color[0]*color[3], color[1]*color[3], color[2]*color[3], color[3]);
+	}
+)";
+
+
+const char* MansInterfacin::GraphicsSystem::shader_font = R"(
+	cbuffer VS_CONSTANT_BUFFER : register(b0)
+	{
+		matrix mMat;
+	};
+
+	struct VOut
+	{
+		float4 position : SV_POSITION;
+		float4 color : COLOR;
+		float2 texcoord : TEXCOORD;
+	};
+
+	VOut VShader(float4 position : POSITION, float4 color : COLOR, float2 texcoord : TEXCOORD)
+	{
+		VOut output;
+		output.position = mul(mMat, position);
+		output.texcoord = texcoord;
+		output.color = color;
+		return output;
+	}
+
+
+	Texture2D objTexture : TEXTURE : register(t0);
+	SamplerState objSamplerState : SAMPLER : register(s0);
+
+	float4 PShader(float4 position : SV_POSITION, float4 color : COLOR, float2 texcoord : TEXCOORD) : SV_TARGET
+	{
+		float alpha = objTexture.Sample(objSamplerState, texcoord)[3]*color[3];
+
+		return float4(color[0]*alpha, color[1]*alpha, color[2]*alpha, alpha);
 	}
 )";

@@ -84,16 +84,14 @@ struct LocaEntryLong {
 	void fix_endian() { this->offset = _byteswap_ulong(this->offset); }
 };
 
-
+struct GlyfData {
+	struct GlyfCoords { int16_t x, y; bool on_curve; };
+	std::vector<GlyfCoords> coords;
+	std::vector<uint16_t> skips;
+};
 
 struct GlyfEntry {
-	typedef uint8_t VariableGlyfData;
-	struct GlyfData {
-		struct GlyfCoords {int16_t x, y; bool on_curve;};
-		std::vector<GlyfCoords> coords;
-		std::vector<uint16_t> skips;
-	};
-	
+	typedef uint8_t VariableGlyfData;	
 
 	int16_t num_contours;
 	int16_t x_min;
@@ -103,16 +101,13 @@ struct GlyfEntry {
 	VariableGlyfData simple_data[0];
 
 	void fix_endian();
-
-
 	bool getSimpleCoords(GlyfData& vec);
-
 };
 
 #pragma pack(pop)
 
 
-void Nozero(const std::vector<f2coord>& coords, const std::vector<uint16_t>& skips, uint8_t(*result)[4], size_t width, size_t height);
+void Nozero(const std::vector<f2coord>& coords, const std::vector<uint16_t>& skips, uint8_t* result, size_t width, size_t height);
 
 struct TrueTypeFontFile {
 	enum TableTypes {
@@ -142,6 +137,8 @@ struct TrueTypeFontFile {
 	void close();
 
 	void* loadTable(TableTypes type);
+
+
 
 
 	FILE* file;

@@ -2,6 +2,7 @@
 
 #include <Windows.h>
 #include <vector>
+#include <list>
 
 #include "Datatypes.h"
 
@@ -46,6 +47,8 @@ public:
 
 	class GraphicsSystem { friend class UI; friend int main();
 	public:
+		enum struct Topologies{TRIANGLE_LIST, TRIANGLE_STRIP};
+
 		GraphicsSystem(NativeWindowSystem* native_window_system, void(*Callback_initedGraphics)(GraphicsSystem*) = 0);
 
 		void InitD3D();				            // sets up and initializes Direct3D
@@ -54,6 +57,7 @@ public:
 		void UpdateVertexBuffer(const std::vector<f3coord>& vertex_array);
 		void UpdateColorsBuffer(const std::vector<f4color>& colors_array);
 		void UpdateTexelsBuffer(const std::vector<f2coord>& coords_array);
+		void SetTopology(Topologies topology);
 
 		void SetRenderColorState();
 		void SetRenderTextureState();
@@ -69,7 +73,6 @@ public:
 		void PresentFrame();
 		void ClearFrame(f4color col);
 
-	private:
 		NativeWindowSystem* WindowSystem;
 		void(*callback_initedgraphics)(GraphicsSystem*);
 
@@ -92,7 +95,7 @@ public:
 		};
 
 		struct Texture2D { friend class UI;
-			enum struct TextureFormat{RGBA32};
+			enum struct TextureFormat{RGBA32, A8};
 		private:
 			unsigned width, height;
 			ResourceModifyFreq modfreq;
@@ -101,31 +104,38 @@ public:
 			ID3D11Texture2D* d3d_obj;
 			ID3D11ShaderResourceView* d3d_obj_resourceview;
 		};
-		typedef size_t Texture2D_ID;
 
-		struct VertexBuffer {
-			friend class UI;
+		struct D3DBuffer { friend class UI;
 			unsigned element_size;
 			unsigned buffer_size;
 			ID3D11Buffer* d3d_obj;
 			ResourceModifyFreq modfreq;
 		};
-		typedef size_t VertexBuffer_ID;
+
+		typedef D3DBuffer VertexBuffer;
+		typedef D3DBuffer IndexBuffer;
 
 		UI(GraphicsSystem* graphics_system);
 
-		Texture2D_ID CreateTexture2D(unsigned width, unsigned height, ResourceModifyFreq modfreq, Texture2D::TextureFormat format, uint8_t* init_data = 0);
-		bool UpdateTexture2D(Texture2D_ID textureID, uint8_t* data);
-		void SetTexture(Texture2D_ID textureID);
+		Texture2D* Create2DTexture(unsigned width, unsigned height, ResourceModifyFreq modfreq, Texture2D::TextureFormat format, uint8_t* init_data = 0);
+		bool Update2DTexture(Texture2D* texture, uint8_t* data);
+		void Set2DTexture(Texture2D* texture);
+		void Destroy2DTexture(Texture2D* texture);
 
-		Texture2D_ID CreateVertexBuffer(unsigned element_size, unsigned buffer_size, ResourceModifyFreq modfreq, uint8_t* int_data = 0);
-		bool UpdateVertexBuffer(Texture2D_ID bufferID, uint8_t* data);
-		void SetBuffers(Texture2D_ID* bufferIDs, uint32_t amount);
+		VertexBuffer* CreateVertexBuffer(unsigned element_size, unsigned buffer_size, ResourceModifyFreq modfreq, uint8_t* init_data = 0);
+		bool UpdateVertexBuffer(VertexBuffer* buffer, uint8_t* data);
+		void SetVertexBuffers(VertexBuffer** buffers, uint32_t amount);
+		void DestroyVertexBuffer(VertexBuffer* buffers);
+
+		IndexBuffer* CreateIndexBuffer(unsigned element_size, unsigned buffer_size, ResourceModifyFreq modfreq, uint8_t* init_data = 0);
+		bool UpdateIndexBuffer(IndexBuffer* buffer, uint8_t* data);
+		void SetIndexBuffer(IndexBuffer* buffer);
+		void DestroyIndexBuffer(IndexBuffer* buffer);
 
 
 		GraphicsSystem* graphics_system;
-		std::vector<Texture2D> textures = std::vector<Texture2D>();
-		std::vector<VertexBuffer> buffers = std::vector<VertexBuffer>();
+		std::list<Texture2D> textures   = std::list<Texture2D>();
+		std::list<VertexBuffer> buffers = std::list<VertexBuffer>();
 	}ui;
 public:
 

@@ -144,7 +144,7 @@ const uint32_t TrueTypeFontFile::TagValues[] = {
 
 
 
-void Nozero(const std::vector<f2coord>& coords, const std::vector<uint16_t>& skips, uint8_t (*result)[4], size_t width, size_t height){
+void Nozero(const std::vector<f2coord>& coords, const std::vector<uint16_t>& skips, uint8_t *result, size_t width, size_t height){
 	//line segment
 	struct line {
 		//the 2 points that constitute the line segment
@@ -268,7 +268,7 @@ void Nozero(const std::vector<f2coord>& coords, const std::vector<uint16_t>& ski
 				}
 			}
 
-			result[y * width + x][3] = (touchy)?0xFF:0;
+			*(result++) = (touchy)?0xFF:0;
 		}
 	}
 }

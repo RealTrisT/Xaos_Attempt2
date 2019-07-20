@@ -23,11 +23,6 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 			puts("painting frame 2");
 			break;
 		case WM_MOUSEMOVE:
-			//HyperionUD->ShitImage(screen); HyperionUD->PresentFrame();
-			//elUD->ClearFrame({ 0, 0, 0, 0 });
-			//elUD->Draw(vertexes.size());
-			//elUD->graphics_system.PresentFrame();
-			//printf("painting frame");
 			break;
 	} return DefWindowProc(hWnd, message, wParam, lParam);
 };
@@ -65,13 +60,13 @@ int main() {
 
 	elUD->Intialize();
 
-	MansInterfacin::UI::VertexBuffer_ID buffers[2] = {
+	MansInterfacin::UI::VertexBuffer* buffers[2] = {
 		elUD->ui.CreateVertexBuffer(sizeof(f3coord),	vertexes.size(),	MansInterfacin::UI::ResourceModifyFreq::SOMETIMES, (uint8_t*)vertexes.data() ),
 		elUD->ui.CreateVertexBuffer(sizeof(colortexel), colortexs.size(),   MansInterfacin::UI::ResourceModifyFreq::SOMETIMES, (uint8_t*)colortexs.data()),
 	};
-	elUD->ui.SetBuffers(buffers, 2);
+	elUD->ui.SetVertexBuffers(buffers, 2);
 
-	auto texture = elUD->ui.CreateTexture2D(
+	auto texture = elUD->ui.Create2DTexture(
 		file.header.image_specification.width, 
 		file.header.image_specification.height, 
 		MansInterfacin::UI::ResourceModifyFreq::ALWAYS, 
@@ -79,7 +74,7 @@ int main() {
 		splash.data()
 	);
 
-	elUD->ui.SetTexture(texture);
+	elUD->ui.Set2DTexture(texture);
 
 	elUD->graphics_system.SetNullStencilState();
 	elUD->graphics_system.SetRenderTextureState();
@@ -87,7 +82,7 @@ int main() {
 
 	elUD->graphics_system.PresentFrame();
 
-	/*/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	////////////////////////////////////////////////////////////////////////TESTING WINDOW///////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	
@@ -122,6 +117,7 @@ int main() {
 	WindowSystem::Window::Create(&window, &wi, elUD);
 	window.Draw(elUD);
 	
+	
 
 
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -133,7 +129,7 @@ int main() {
 	if (!TargaFile::open("../test_images/consolas_ascii_alpha.tga", &font)) { printf("REEEEEEEEEEEEEe\n"); return 0; }
 	std::vector<uint8_t> font_buffer = std::vector<uint8_t>(font.header.image_specification.width * font.header.image_specification.height * 4);
 	font.readIntoRGBA32(font_buffer.data());
-	auto font_texture = elUD->ui.CreateTexture2D(font.header.image_specification.width, font.header.image_specification.height, MansInterfacin::UI::ResourceModifyFreq::SOMETIMES, MansInterfacin::UI::Texture2D::TextureFormat::RGBA32, font_buffer.data());
+	auto font_texture = elUD->ui.Create2DTexture(font.header.image_specification.width, font.header.image_specification.height, MansInterfacin::UI::ResourceModifyFreq::SOMETIMES, MansInterfacin::UI::Texture2D::TextureFormat::RGBA32, font_buffer.data());
 
 	WindowSystem::AsciiFont ascii_font = {};
 	WindowSystem::AsciiFont::Create(&ascii_font, font_texture, 16, 29);
@@ -142,69 +138,7 @@ int main() {
 	ascii_text.Draw(elUD);
 
 
-	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	////////////////////////////////////////////////////////////////////////TESTING NOZERO///////////////////////////////////////////////////////////////
-	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-	bool* boolez = new bool[640 * 640];
-	std::vector<f2coord> coords = {
-		{471, 354},//A
-		{508, 354},//B
-		{557, 303},//C
-		{557, 266},//D
-		{557, 248},//E
-		{544, 217},//F
-		{521, 194},//G
-		{489, 180},//H
-		{471, 180},//I
-		{453, 180},//J
-		{422, 194},//K
-		{399, 217},//L
-		{385, 248},//M
-		{385, 266},//N
-		{385, 284},//O
-		{399, 316},//P
-		{422, 340},//Q
-		{453, 354},//R
-		{471, 354}//S
-		//{200, 200},
-		//{400, 200},
-		//{400, 400},
-		//{200, 400},
-		//{200, 200}
-	};
-
-	Nozero(coords, boolez , 640, 640);
-
-	std::vector<uint8_t[4]> colorz(640 * 640);
-
-	for (size_t i = 0; i < colorz.size(); i++) {
-		colorz[i][0] = 255;
-		colorz[i][1] = 255;
-		colorz[i][2] = 255;
-		colorz[i][3] = boolez[i] ? 255 : 0;
-	}
-
-	delete[] boolez;
-	
-	auto tex = elUD->ui.CreateTexture2D(640, 640, MansInterfacin::UI::ResourceModifyFreq::SOMETIMES, MansInterfacin::UI::Texture2D::TextureFormat::RGBA32, (uint8_t*)colorz.data());
-
-	vertexes[0].x += 640;
-	vertexes[1].x += 640;
-	vertexes[2].x += 640;
-	vertexes[3].x += 640;
-
-	elUD->ui.UpdateVertexBuffer(buffers[0], (uint8_t*)vertexes.data());
-
-	elUD->ui.SetBuffers(buffers, 2);
-	elUD->ui.SetTexture(tex);
-
-	elUD->graphics_system.Draw(4);
-
-
-	elUD->graphics_system.PresentFrame();*/
-
-	
+	elUD->graphics_system.PresentFrame();
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////////TESTING TTF/////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -222,10 +156,21 @@ int main() {
 	HeadTable* head = (HeadTable*)ttf.loadTable(TrueTypeFontFile::FONT_TABLE_head);
 	head->fix_endian();
 
+
 	printf("Value of Index To Loc Format: %.4X\n", head->index_to_loc_format);
 
 	MaxpTable* maxp = (MaxpTable*)ttf.loadTable(TrueTypeFontFile::FONT_TABLE_maxp);
 	maxp->fix_endian();
+
+	
+
+	printf(
+		"Font xmin ymin xmax ymax: %d %d %d %d. There are %d glyphs in this font.\n"
+		"To render this font into a texture for each character to have a width of 10 pixels with brute forcing, it would require %lu x %lu pixels! Kys!\n", 
+		head->x_min, head->y_min, head->x_max, head->y_max, maxp->num_glyphs,
+		10 * maxp->num_glyphs, (uint32_t)(float(head->y_max - head->y_min) * 10.f / (head->x_max - head->x_min) * maxp->num_glyphs)
+	);
+
 
 	LocaEntryLong*loca = (LocaEntryLong*)ttf.loadTable(TrueTypeFontFile::FONT_TABLE_loca);
 	for (uint16_t i = 0; i < maxp->num_glyphs; i++) { loca[i].fix_endian(); }
@@ -239,7 +184,7 @@ int main() {
 	GlyfEntry* glyf = (GlyfEntry*)(glyf_table + loca[4].offset);
 	glyf->fix_endian();
 
-	GlyfEntry::GlyfData data_glyf; 
+	GlyfData data_glyf; 
 
 	if (!glyf->getSimpleCoords(data_glyf)) {
 		puts("done fucked up");
@@ -278,11 +223,10 @@ int main() {
 		whole[index++] = {float((point.x - glyf->x_min)), float((point.y - glyf->y_min))};
 	}
 
-	std::vector<uint8_t[4]> endresult(width* height);
-	for (auto each : endresult) *(uint32_t*)each = 0x00FFFFFF;
+	std::vector<uint8_t> endresult(width* height);
 	Nozero(whole, data_glyf.skips, endresult.data(), width, height);
 	
-	auto tex = elUD->ui.CreateTexture2D(width, height, MansInterfacin::UI::ResourceModifyFreq::SOMETIMES, MansInterfacin::UI::Texture2D::TextureFormat::RGBA32, (uint8_t*)endresult.data());
+	auto tex = elUD->ui.Create2DTexture(width, height, MansInterfacin::UI::ResourceModifyFreq::SOMETIMES, MansInterfacin::UI::Texture2D::TextureFormat::A8, (uint8_t*)endresult.data());
 
 	vertexes[0].x += 640;	vertexes[1].x += 640;	vertexes[2].x += 640;	vertexes[3].x += 640;
 	colortexs[0].t = { 0.0, 1.0 }; colortexs[1].t = { 1.0, 1.0 }; colortexs[2].t = { 0.0, 0.0 }; colortexs[3].t = { 1.0, 0.0 };
@@ -290,8 +234,8 @@ int main() {
 	elUD->ui.UpdateVertexBuffer(buffers[0], (uint8_t*)vertexes.data());
 	elUD->ui.UpdateVertexBuffer(buffers[1], (uint8_t*)colortexs.data());
 
-	elUD->ui.SetBuffers(buffers, 2);
-	elUD->ui.SetTexture(tex);
+	elUD->ui.SetVertexBuffers(buffers, 2);
+	elUD->ui.Set2DTexture(tex);
 	elUD->graphics_system.Draw(4);
 	elUD->graphics_system.PresentFrame();
 	

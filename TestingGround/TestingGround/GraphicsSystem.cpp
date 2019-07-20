@@ -323,6 +323,10 @@ void MansInterfacin::GraphicsSystem::UpdateTexelsBuffer(const std::vector<f2coor
 	this->context->Unmap(pTexelsBuffer, NULL);
 }
 
+void MansInterfacin::GraphicsSystem::SetTopology(Topologies topology){
+	this->context->IASetPrimitiveTopology(topology == Topologies::TRIANGLE_LIST ? D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST : D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+}
+
 void MansInterfacin::GraphicsSystem::SetRenderColorState() {
 	context->PSSetShader(pPS_color, 0, 0);
 	context->VSSetShader(pVS_color, 0, 0);

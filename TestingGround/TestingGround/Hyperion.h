@@ -7,7 +7,7 @@
 
 namespace WindowSystem {
 	struct AsciiFont {
-		static void Create(AsciiFont* instance, MansInterfacin::UI::Texture2D_ID texture, unsigned letter_width, unsigned letter_height) {
+		static void Create(AsciiFont* instance, MansInterfacin::UI::Texture2D* texture, unsigned letter_width, unsigned letter_height) {
 			instance->texture = texture; 
 			instance->letter_width = letter_width;
 			instance->letter_height = letter_height;
@@ -15,7 +15,7 @@ namespace WindowSystem {
 			instance->texel_width  = (float)letter_width  / (float)(letter_width*32);
 			instance->texel_height = (float)letter_height / (float)(letter_height*3);
 		}
-		MansInterfacin::UI::Texture2D_ID texture;
+		MansInterfacin::UI::Texture2D* texture;
 		unsigned letter_width, letter_height;
 
 		float texel_width, texel_height;
@@ -59,8 +59,8 @@ namespace WindowSystem {
 		}
 
 		void Draw(MansInterfacin* m) {
-			m->ui.SetTexture(this->font->texture);
-			m->ui.SetBuffers(this->vbuffers, 2);		//TODO: create a buffer list class for making setbuffers faster
+			m->ui.Set2DTexture(this->font->texture);
+			m->ui.SetVertexBuffers(this->vbuffers, 2);		//TODO: create a buffer list class for making setbuffers faster
 			m->graphics_system.SetRenderTextureState();
 			m->graphics_system.SetNullStencilState();
 			m->graphics_system.Draw(this->ascii_buffer.size());
@@ -73,7 +73,7 @@ namespace WindowSystem {
 
 		std::vector<f3coord> ascii_buffer;
 		std::vector<colortexel> ascii_texture_points;
-		MansInterfacin::UI::VertexBuffer_ID vbuffers[2] = {}; //0 : vertex buffer ; 1 : color and texel buffer
+		MansInterfacin::UI::VertexBuffer* vbuffers[2] = {}; //0 : vertex buffer ; 1 : color and texel buffer
 	};
 
 
@@ -84,7 +84,7 @@ namespace WindowSystem {
 			bool is_texture;
 			union {
 				struct {
-					MansInterfacin::UI::Texture2D_ID texture;
+					MansInterfacin::UI::Texture2D* texture;
 					f2coord corner_texel_coords[4];
 				}texture_info;
 				struct {
@@ -97,7 +97,7 @@ namespace WindowSystem {
 			bool background_is_texture;
 			union {
 				struct {
-					MansInterfacin::UI::Texture2D_ID texture;
+					MansInterfacin::UI::Texture2D* texture;
 					f2coord corner_texel_coords[4];
 				}texture_info;
 				struct {
@@ -119,7 +119,7 @@ namespace WindowSystem {
 
 		f3coord bg_and_border_vb[8] = {};
 		colortexel bg_and_border_ct[8] = {};
-		MansInterfacin::UI::VertexBuffer_ID vbuffers[2] = {}; //0 : vertex buffer ; 1 : color and texel buffer
+		MansInterfacin::UI::VertexBuffer* vbuffers[2] = {}; //0 : vertex buffer ; 1 : color and texel buffer
 
 		static void Create(Window* window, WindowInfo* window_info, MansInterfacin* m) {
 			memcpy(&window->window_info, window_info, sizeof(WindowInfo));
@@ -167,12 +167,12 @@ namespace WindowSystem {
 		}
 
 		void Draw(MansInterfacin* m) {
-			m->ui.SetBuffers(vbuffers, 2);
+			m->ui.SetVertexBuffers(vbuffers, 2);
 			m->graphics_system.SetSubtractiveStencilState(1);
 
 			if (this->window_info.background.background_is_texture) {
 				m->graphics_system.SetRenderTextureState();
-				m->ui.SetTexture(this->window_info.background.texture_info.texture);
+				m->ui.Set2DTexture(this->window_info.background.texture_info.texture);
 			}else{
 				m->graphics_system.SetRenderColorState();
 			}

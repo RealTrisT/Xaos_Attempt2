@@ -66,7 +66,7 @@ int main() {
 	};
 	elUD->ui.SetVertexBuffers(buffers, 2);
 
-	/*auto texture = elUD->ui.Create2DTexture(
+	auto texture = elUD->ui.Create2DTexture(
 		file.header.image_specification.width, 
 		file.header.image_specification.height, 
 		MansInterfacin::UI::ResourceModifyFreq::ALWAYS, 
@@ -142,7 +142,7 @@ int main() {
 	/////////////////////////////////////////////////////////////////////////TESTING TTF/////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	*/
+	
 	TrueTypeFontFile ttf = {};
 	if (!TrueTypeFontFile::Open(&ttf, "../test_images/consola.ttf")) { puts("FUCK"); getchar(); return 0; }	
 
@@ -197,7 +197,9 @@ int main() {
 		uint16_t* startcodes = &endcodes[ranges + 1];
 		printf("%.4X-%.4X%c", startcodes[i], endcodes[i], i % 2 ? '\n' : ' ');
 	}
+
 	uint16_t rusha = unicode_subtable_format4->GetCheeseGlyphIndex(0x416);  // <----------------------
+		
 	printf("0x416: the russian thang is glyph index 0x%X or %dd\n", rusha, rusha);
 
 	//---------------------------------------------------------loca

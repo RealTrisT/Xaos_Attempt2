@@ -6,10 +6,14 @@
 
 #include "Datatypes.h"
 
+//-----------------------------------------------------------------------------------------------------------------------TYPES
+
 //fixed point number with 16 bits for integer and 16 for decimal
 typedef struct { uint16_t first, second; } Fixed;
 //Font Word, represents font units aka EM - which was orignally used in the press as a measure of printers, and is represented by the width of an upper case M
 typedef int16_t FWord;
+
+//-----------------------------------------------------------------------------------------------------------------------Offset subtable
 
 #pragma pack(push, 1) 
 //The first table in the TTF file
@@ -30,6 +34,8 @@ struct OffsetSubtable {
 	void fix_endian();
 };
 
+//-----------------------------------------------------------------------------------------------------------------------Directory table
+
 //Directory table
 struct DirectoryTableEntry {
 	//Name of the table.
@@ -44,6 +50,8 @@ struct DirectoryTableEntry {
 	//set correct endianness, since ttf fonts are big endian
 	void fix_endian();
 };
+
+//-----------------------------------------------------------------------------------------------------------------------Head table
 
 struct HeadTable {
 	Fixed	 version;
@@ -67,12 +75,16 @@ struct HeadTable {
 	void fix_endian();
 };
 
+//-----------------------------------------------------------------------------------------------------------------------Maxp table
+
 struct MaxpTable {	//TODO: implement version 1.0
 	Fixed version;
 	uint16_t num_glyphs;
 
 	void fix_endian();
 };
+
+//-----------------------------------------------------------------------------------------------------------------------Loca table
 
 struct LocaEntryShort {
 	uint16_t offset;
@@ -83,6 +95,8 @@ struct LocaEntryLong {
 	uint32_t offset;
 	void fix_endian() { this->offset = _byteswap_ulong(this->offset); }
 };
+
+//-----------------------------------------------------------------------------------------------------------------------Glyf table
 
 struct GlyfData {
 	struct GlyfCoords { int16_t x, y; bool on_curve; };
@@ -104,10 +118,71 @@ struct GlyfEntry {
 	bool getSimpleCoords(GlyfData& vec);
 };
 
+//-----------------------------------------------------------------------------------------------------------------------Cmap table
+
+
+struct CmapEncodingSubtableEntry {
+	enum struct PlatformIDs : uint16_t {
+		UNICODE,
+		MACINTOSH,
+		RESERVED,
+		MICROSOFT
+	};
+
+	enum struct UnicodeSpecificIDs : uint16_t {
+		DEFAULT_SEMANTICS,
+		VERSION_1_1_SEMANTICS,
+		ISO_1993,
+		UNICODE_2_0_BMPONLY,
+		UNICODE_2_0_NONBMP_ALLOWED,
+		UNICODE_VARIATION_SEQUENCES,
+		FULL_UNICODE_COVERAGE
+	};
+
+	PlatformIDs platform_id;
+	UnicodeSpecificIDs platform_specific_id;
+	uint32_t offset;
+
+	void fix_endian();
+};
+
+struct CmapTable {
+	uint16_t version;
+	uint16_t num_subtables;
+	CmapEncodingSubtableEntry entries[0];
+
+	void fix_endian();
+};
+
+
+struct CmapSubtable {
+	uint16_t version;
+	uint16_t length;
+
+	void fix_endian();
+};
+
+struct CmapFormat4 : public CmapSubtable {
+	uint16_t language;
+	uint16_t seg_count_x2;
+	uint16_t search_range;
+	uint16_t entry_selector;
+	uint16_t range_shift;
+	uint16_t end_codes[0];
+
+	void fix_endian();
+
+	uint16_t GetCheeseGlyphIndex(uint16_t cheese_code);
+};
+
 #pragma pack(pop)
 
+//-----------------------------------------------------------------------------------------------------------------------Nozero
 
 void Nozero(const std::vector<f2coord>& coords, const std::vector<uint16_t>& skips, uint8_t* result, size_t width, size_t height);
+
+
+//-----------------------------------------------------------------------------------------------------------------------Font file class
 
 struct TrueTypeFontFile {
 	enum TableTypes {

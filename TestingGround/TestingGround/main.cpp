@@ -66,7 +66,7 @@ int main() {
 	};
 	elUD->ui.SetVertexBuffers(buffers, 2);
 
-	auto texture = elUD->ui.Create2DTexture(
+	/*auto texture = elUD->ui.Create2DTexture(
 		file.header.image_specification.width, 
 		file.header.image_specification.height, 
 		MansInterfacin::UI::ResourceModifyFreq::ALWAYS, 
@@ -117,7 +117,6 @@ int main() {
 	WindowSystem::Window::Create(&window, &wi, elUD);
 	window.Draw(elUD);
 	
-	
 
 
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -143,6 +142,7 @@ int main() {
 	/////////////////////////////////////////////////////////////////////////TESTING TTF/////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+	*/
 	TrueTypeFontFile ttf = {};
 	if (!TrueTypeFontFile::Open(&ttf, "../test_images/consola.ttf")) { puts("FUCK"); getchar(); return 0; }	
 
@@ -153,35 +153,67 @@ int main() {
 	printf("GLYF table offset: %X\n", ttf.table_lookup[TrueTypeFontFile::FONT_TABLE_glyf].table_entry->offset);
 
 
+	//---------------------------------------------------------head
+
 	HeadTable* head = (HeadTable*)ttf.loadTable(TrueTypeFontFile::FONT_TABLE_head);
 	head->fix_endian();
 
 
 	printf("Value of Index To Loc Format: %.4X\n", head->index_to_loc_format);
 
+	//---------------------------------------------------------mapx
+
 	MaxpTable* maxp = (MaxpTable*)ttf.loadTable(TrueTypeFontFile::FONT_TABLE_maxp);
 	maxp->fix_endian();
 
+	//---------------------------------------------------------cmap
 	
+	CmapTable* cmap = (CmapTable*)ttf.loadTable(TrueTypeFontFile::FONT_TABLE_cmap);
+	cmap->fix_endian();
 
-	printf(
-		"Font xmin ymin xmax ymax: %d %d %d %d. There are %d glyphs in this font.\n"
-		"To render this font into a texture for each character to have a width of 10 pixels with brute forcing, it would require %lu x %lu pixels! Kys!\n", 
-		head->x_min, head->y_min, head->x_max, head->y_max, maxp->num_glyphs,
-		10 * maxp->num_glyphs, (uint32_t)(float(head->y_max - head->y_min) * 10.f / (head->x_max - head->x_min) * maxp->num_glyphs)
-	);
+	printf("CMAP: %X\n", cmap);
+	CmapSubtable* unicode_subtable = 0;
 
+	for (uint16_t i = 0; i < cmap->num_subtables; i++) {
+		cmap->entries[i].fix_endian();
+		if (cmap->entries[i].platform_id == CmapEncodingSubtableEntry::PlatformIDs::UNICODE && cmap->entries[i].platform_specific_id >= CmapEncodingSubtableEntry::UnicodeSpecificIDs::UNICODE_2_0_BMPONLY)
+			unicode_subtable = (CmapSubtable*)(((uint8_t*)cmap) + cmap->entries[i].offset);
+		printf("CMAP Table: %u -> %u, with offset 0x%.8X\n", cmap->entries[i].platform_id, cmap->entries[i].platform_specific_id, cmap->entries[i].offset);
+	}
 
-	LocaEntryLong*loca = (LocaEntryLong*)ttf.loadTable(TrueTypeFontFile::FONT_TABLE_loca);
+	printf("UNICODE_SUBTABLE: %X\n", unicode_subtable);
+
+	unicode_subtable->fix_endian();
+	printf("unicode subtable version: %u; length: 0x%X\n", unicode_subtable->version, unicode_subtable->length);
+
+	CmapFormat4* unicode_subtable_format4 = (CmapFormat4*)unicode_subtable;
+	unicode_subtable_format4->fix_endian();
+
+	puts("RANGES: ");
+
+	uint16_t ranges = unicode_subtable_format4->seg_count_x2 / 2;
+	for (uint16_t i = 0; i < ranges; i++) {
+		uint16_t* endcodes = unicode_subtable_format4->end_codes;
+		uint16_t* startcodes = &endcodes[ranges + 1];
+		printf("%.4X-%.4X%c", startcodes[i], endcodes[i], i % 2 ? '\n' : ' ');
+	}
+	uint16_t rusha = unicode_subtable_format4->GetCheeseGlyphIndex(0x416);  // <----------------------
+	printf("0x416: the russian thang is glyph index 0x%X or %dd\n", rusha, rusha);
+
+	//---------------------------------------------------------loca
+
+	LocaEntryLong* loca = (LocaEntryLong*)ttf.loadTable(TrueTypeFontFile::FONT_TABLE_loca);
 	for (uint16_t i = 0; i < maxp->num_glyphs; i++) { loca[i].fix_endian(); }
 		
 	for (int i = 0; i < 20; i++) {
 		printf("%d : 0x%.8X\n", i, loca[i].offset);
 	}
 
+	//---------------------------------------------------------glyf
+
 	uint8_t* glyf_table = (uint8_t*)ttf.loadTable(TrueTypeFontFile::FONT_TABLE_glyf);
 
-	GlyfEntry* glyf = (GlyfEntry*)(glyf_table + loca[4].offset);
+	GlyfEntry* glyf = (GlyfEntry*)(glyf_table + loca[rusha].offset);
 	glyf->fix_endian();
 
 	GlyfData data_glyf; 
@@ -242,6 +274,7 @@ int main() {
 	elUD->graphics_system.Draw(4);
 	elUD->graphics_system.PresentFrame();
 	
+
 	ttf.close();
 
 	getchar();

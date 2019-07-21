@@ -1,52 +1,127 @@
 #include "TTF.h"
 
 void OffsetSubtable::fix_endian() {
-	this->trash							= _byteswap_ulong(this->trash);
-	this->num_tables					= _byteswap_ushort(this->num_tables);
-	this->search_range					= _byteswap_ushort(this->search_range);
-	this->query_selectors				= _byteswap_ushort(this->query_selectors);
-	this->range_shift					= _byteswap_ushort(this->range_shift);
+	this->trash								= _byteswap_ulong(this->trash);
+	this->num_tables						= _byteswap_ushort(this->num_tables);
+	this->search_range						= _byteswap_ushort(this->search_range);
+	this->query_selectors					= _byteswap_ushort(this->query_selectors);
+	this->range_shift						= _byteswap_ushort(this->range_shift);
 }
 
 void DirectoryTableEntry::fix_endian() {
-	this->checksum						= _byteswap_ulong(this->checksum);
-	this->offset						= _byteswap_ulong(this->offset);
-	this->length						= _byteswap_ulong(this->length);
+	this->checksum							= _byteswap_ulong(this->checksum);
+	this->offset							= _byteswap_ulong(this->offset);
+	this->length							= _byteswap_ulong(this->length);
 }
 
 
 void HeadTable::fix_endian() {
-	*(uint32_t*)&this->version			= _byteswap_ulong(*(uint32_t*)&this->version);
-	*(uint32_t*)&this->font_revision	= _byteswap_ulong(*(uint32_t*)&this->font_revision);
-	this->checksum_adjustment			= _byteswap_ulong(this->checksum_adjustment);
-	this->magic							= _byteswap_ulong(this->magic);
-	this->flags							= _byteswap_ushort(this->flags);
-	this->units_per_EM					= _byteswap_ushort(this->units_per_EM);
-	this->date_created					= _byteswap_uint64(this->date_created);
-	this->date_modified					= _byteswap_uint64(this->date_modified);
-	this->x_min							= _byteswap_ushort(this->x_min);
-	this->y_min							= _byteswap_ushort(this->y_min);
-	this->x_max							= _byteswap_ushort(this->x_max);
-	this->y_max							= _byteswap_ushort(this->y_max);
-	this->mac_style						= _byteswap_ushort(this->mac_style);
-	this->lowest_rec_ppEM				= _byteswap_ushort(this->lowest_rec_ppEM);
-	this->font_direction_hint			= _byteswap_ushort(this->font_direction_hint);
-	this->index_to_loc_format			= _byteswap_ushort(this->index_to_loc_format);
-	this->glyph_data_format				= _byteswap_ushort(this->glyph_data_format);
+	*(uint32_t*)&this->version				= _byteswap_ulong(*(uint32_t*)&this->version);
+	*(uint32_t*)&this->font_revision		= _byteswap_ulong(*(uint32_t*)&this->font_revision);
+	this->checksum_adjustment				= _byteswap_ulong(this->checksum_adjustment);
+	this->magic								= _byteswap_ulong(this->magic);
+	this->flags								= _byteswap_ushort(this->flags);
+	this->units_per_EM						= _byteswap_ushort(this->units_per_EM);
+	this->date_created						= _byteswap_uint64(this->date_created);
+	this->date_modified						= _byteswap_uint64(this->date_modified);
+	this->x_min								= _byteswap_ushort(this->x_min);
+	this->y_min								= _byteswap_ushort(this->y_min);
+	this->x_max								= _byteswap_ushort(this->x_max);
+	this->y_max								= _byteswap_ushort(this->y_max);
+	this->mac_style							= _byteswap_ushort(this->mac_style);
+	this->lowest_rec_ppEM					= _byteswap_ushort(this->lowest_rec_ppEM);
+	this->font_direction_hint				= _byteswap_ushort(this->font_direction_hint);
+	this->index_to_loc_format				= _byteswap_ushort(this->index_to_loc_format);
+	this->glyph_data_format					= _byteswap_ushort(this->glyph_data_format);
 }
 
 
 void GlyfEntry::fix_endian(){
-	this->num_contours					= _byteswap_ushort(this->num_contours);
-	this->x_min							= _byteswap_ushort(this->x_min);
-	this->y_min							= _byteswap_ushort(this->y_min);
-	this->x_max							= _byteswap_ushort(this->x_max);
-	this->y_max							= _byteswap_ushort(this->y_max);
+	this->num_contours						= _byteswap_ushort(this->num_contours);
+	this->x_min								= _byteswap_ushort(this->x_min);
+	this->y_min								= _byteswap_ushort(this->y_min);
+	this->x_max								= _byteswap_ushort(this->x_max);
+	this->y_max								= _byteswap_ushort(this->y_max);
 }
 
 void MaxpTable::fix_endian(){
-	*(uint32_t*)& this->version			= _byteswap_ulong(*(uint32_t*)& this->version);
-	this->num_glyphs					= _byteswap_ushort(this->num_glyphs);
+	*(uint32_t*)& this->version				= _byteswap_ulong(*(uint32_t*)& this->version);
+	this->num_glyphs						= _byteswap_ushort(this->num_glyphs);
+}
+
+void CmapTable::fix_endian() {
+	this->version							= _byteswap_ushort(this->version);
+	this->num_subtables						= _byteswap_ushort(this->num_subtables);
+}
+
+void CmapEncodingSubtableEntry::fix_endian() {
+	*(uint16_t*)&this->platform_id			= _byteswap_ushort((uint16_t)this->platform_id);
+	*(uint16_t*)&this->platform_specific_id	= _byteswap_ushort((uint16_t)this->platform_specific_id);
+	this->offset							= _byteswap_ulong(this->offset);
+}
+
+void CmapSubtable::fix_endian() {
+	this->version							= _byteswap_ushort(this->version);
+	this->length							= _byteswap_ushort(this->length);
+}
+
+void CmapFormat4::fix_endian() {
+	this->language							= _byteswap_ushort(this->language);
+	this->seg_count_x2						= _byteswap_ushort(this->seg_count_x2);
+	this->search_range						= _byteswap_ushort(this->search_range);
+	this->entry_selector					= _byteswap_ushort(this->entry_selector);
+	this->range_shift						= _byteswap_ushort(this->range_shift);
+
+	//segment count
+	uint16_t seg_count = this->seg_count_x2 / 2;
+	//pointer we're gonna be using to increment and change all the values
+	uint16_t* current_array = this->end_codes;
+	//do the end codes
+	for (uint16_t i = 0; i < seg_count; i++, current_array++)*current_array = _byteswap_ushort(*current_array);
+	//move past the reserved padding
+	current_array++;
+	//do the start codes
+	for (uint16_t i = 0; i < seg_count; i++, current_array++)*current_array = _byteswap_ushort(*current_array);
+	//do the id deltas
+	for (uint16_t i = 0; i < seg_count; i++, current_array++)*current_array = _byteswap_ushort(*current_array);
+
+	//variable for the amount of entries in glyphIndexArray
+	uint16_t glyfarr_s = 0;
+	//do the id range offsets
+	for (uint16_t i = 0; i < seg_count; i++, current_array++) {
+		if (*current_array) {
+			*current_array = _byteswap_ushort(*current_array);
+			//if it's not zero, then there's an equivalent in the glyph index array, so increment the size
+			glyfarr_s++;
+		}
+	}
+
+	//and now do all the entries in the glyph index array
+	//for (uint16_t i = 0; i < glyfarr_s; i++, current_array++)*current_array = _byteswap_ushort(*current_array);
+}
+
+uint16_t CmapFormat4::GetCheeseGlyphIndex(uint16_t cheese_code){
+	uint16_t seg_count = this->seg_count_x2 / 2;
+	
+	uint16_t* end_codes			=				this->end_codes;
+	uint16_t* start_codes		=				&end_codes[seg_count + 1];
+	 int16_t* id_delta			= (int16_t*)	&start_codes[seg_count];
+	uint16_t* id_range_offss	= (uint16_t*)	&id_delta[seg_count];
+	uint16_t* glyph_id_arr		=				&id_range_offss[seg_count];
+	
+	uint16_t i = 0;
+	for (; i < seg_count; i++) {
+		if (cheese_code <= end_codes[i]) {
+			if (cheese_code >= start_codes[i])	break;
+			else								return 0;
+		}
+	}
+
+	if (!id_range_offss[i]) {
+		return cheese_code + id_delta[i];
+	}else{
+		return _byteswap_ushort(*(&id_range_offss[i] + (cheese_code - start_codes[i]) + id_range_offss[i]/2));
+	}
 }
 
 bool TrueTypeFontFile::Open(TrueTypeFontFile* instance, const char* path) {

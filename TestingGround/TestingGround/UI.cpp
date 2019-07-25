@@ -270,4 +270,3 @@ void MansInterfacin::UI::DestroyIndexBuffer(IndexBuffer* buffer){
 	//TODO: this is provisory, we need to remove it from the linked list
 	buffer->d3d_obj = 0;
 }
-

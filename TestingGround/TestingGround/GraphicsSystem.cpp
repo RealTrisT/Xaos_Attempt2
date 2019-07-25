@@ -41,6 +41,7 @@ ID3D11PixelShader* pPS_font;     // the pixel shader for fonts
 ID3D11InputLayout* pLayout_font; // the input layout for fonts
 
 ID3D11Buffer* contextstantBuffer = 0; // constant buffer ( where the projection matrix is placed )
+ID3D11Buffer* offset_buffer = 0;		//offset buffer, where a value every vertex is to be multiplied by, is stored
 
 MansInterfacin::GraphicsSystem::GraphicsSystem(NativeWindowSystem* native_window_system, void(*callback_initedgraphics)(GraphicsSystem*)) 
 	: WindowSystem(native_window_system), callback_initedgraphics(callback_initedgraphics)
@@ -188,8 +189,10 @@ void MansInterfacin::GraphicsSystem::InitD3D() {
 
 
 	//--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-	//-------------------------------------------------------------------------PROJECTION MATRIX--------------------------------------------------------------------------------------
+	//--------------------------------------------------------------------------CONSTANT BUFFERS--------------------------------------------------------------------------------------
 	//--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+	//---------------------------------------projection matrix
 
 	DirectX::XMMATRIX orthoMatrix = DirectX::XMMatrixOrthographicOffCenterLH(0.f, float(this->WindowSystem->width), float(this->WindowSystem->height), 0.f, 0.f, 1.f);
 
@@ -207,7 +210,28 @@ void MansInterfacin::GraphicsSystem::InitD3D() {
 	InitData.SysMemSlicePitch = 0;
 
 	device->CreateBuffer(&cbDesc, &InitData, &contextstantBuffer);
-	context->VSSetConstantBuffers(0, 1, &contextstantBuffer);
+
+	D3D11_BUFFER_DESC offset_desc;
+	offset_desc.ByteWidth = sizeof(f3coord);
+	offset_desc.Usage = D3D11_USAGE_DYNAMIC;
+	offset_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	offset_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	offset_desc.MiscFlags = 0;
+	offset_desc.StructureByteStride = 0;
+
+	f3coord offset = { 0, 0, 0 };
+	InitData.pSysMem = &offset;
+	InitData.SysMemPitch = 0;
+	InitData.SysMemSlicePitch = 0;
+
+	printf("CONSTENTINE_ BUFFERRE: %X\n", device->CreateBuffer(&offset_desc, &InitData, &offset_buffer));
+
+	ID3D11Buffer* buffers[2] = {
+		contextstantBuffer,
+		offset_buffer
+	};
+
+	context->VSSetConstantBuffers(0, 2, buffers);
 
 	//--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 	//---------------------------------------------------------------------------VERTEX BUFFER----------------------------------------------------------------------------------------
@@ -354,6 +378,19 @@ void MansInterfacin::GraphicsSystem::ClearStencilBuffer() {
 	this->context->ClearDepthStencilView(pDepthStencilView, D3D11_CLEAR_STENCIL, 1.0f, 0);
 }
 
+void MansInterfacin::GraphicsSystem::SetRenderOffset(f3coord offs) {
+	D3D11_MAPPED_SUBRESOURCE mapped_subresource;
+	if (FAILED(this->context->Map(
+		offset_buffer,
+		NULL,
+		D3D11_MAP_WRITE_DISCARD,
+		NULL,
+		&mapped_subresource
+	)))return;
+	memcpy(mapped_subresource.pData, &offs, sizeof(f3coord));
+	this->context->Unmap(offset_buffer, NULL);
+}
+
 void MansInterfacin::GraphicsSystem::Draw(UINT offset, UINT vertex_amount) {
 	context->Draw(vertex_amount, offset);
 }
@@ -367,10 +404,8 @@ void MansInterfacin::GraphicsSystem::PresentFrame() {
 }
 
 const char* MansInterfacin::GraphicsSystem::shader_color = R"(
-	cbuffer VS_CONSTANT_BUFFER : register(b0)
-	{
-		matrix mMat;
-	};
+	cbuffer VS_CONSTANT_BUFFER : register(b0){matrix mMat;};
+	cbuffer VS_CONSTANT_BUFFER : register(b1){float4 vert_offs;};
 
 	struct VOut
 	{
@@ -381,6 +416,7 @@ const char* MansInterfacin::GraphicsSystem::shader_color = R"(
 	VOut VShader(float4 position : POSITION, float4 color : COLOR)
 	{
 		VOut output;
+		position.xyz += vert_offs.xyz;
 		output.position = mul(mMat, position);
 		output.color = color;
 		return output;
@@ -395,10 +431,8 @@ const char* MansInterfacin::GraphicsSystem::shader_color = R"(
 
 
 const char* MansInterfacin::GraphicsSystem::shader_texture = R"(
-	cbuffer VS_CONSTANT_BUFFER : register(b0)
-	{
-		matrix mMat;
-	};
+	cbuffer VS_CONSTANT_BUFFER : register(b0){matrix mMat;};
+	cbuffer VS_CONSTANT_BUFFER : register(b1){float4 vert_offs;};
 
 	struct VOut
 	{
@@ -409,6 +443,7 @@ const char* MansInterfacin::GraphicsSystem::shader_texture = R"(
 	VOut VShader(float4 position : POSITION, float2 texcoord : TEXCOORD)
 	{
 		VOut output;
+		position.xyz += vert_offs.xyz;
 		output.position = mul(mMat, position);
 		output.texcoord = texcoord;
 		return output;
@@ -427,10 +462,8 @@ const char* MansInterfacin::GraphicsSystem::shader_texture = R"(
 
 
 const char* MansInterfacin::GraphicsSystem::shader_font = R"(
-	cbuffer VS_CONSTANT_BUFFER : register(b0)
-	{
-		matrix mMat;
-	};
+	cbuffer VS_CONSTANT_BUFFER : register(b0){matrix mMat;};
+	cbuffer VS_CONSTANT_BUFFER : register(b1){float4 vert_offs;};
 
 	struct VOut
 	{
@@ -442,6 +475,7 @@ const char* MansInterfacin::GraphicsSystem::shader_font = R"(
 	VOut VShader(float4 position : POSITION, float4 color : COLOR, float2 texcoord : TEXCOORD)
 	{
 		VOut output;
+		position.xyz += vert_offs.xyz;
 		output.position = mul(mMat, position);
 		output.texcoord = texcoord;
 		output.color = color;

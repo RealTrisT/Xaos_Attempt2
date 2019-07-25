@@ -111,7 +111,7 @@ int main() {
 	wi.borders.color_info.color[1] =
 	wi.borders.color_info.color[2] =
 	wi.borders.color_info.color[3] =
-		{0, 0, 1, 1};
+		{0.8, 0.8, 0.8, 1};
 
 
 	WindowSystem::Window::Create(&window, &wi, elUD);
@@ -146,138 +146,76 @@ int main() {
 	TrueTypeFontFile ttf = {};
 	if (!TrueTypeFontFile::Open(&ttf, "../test_images/consola.ttf")) { puts("FUCK"); getchar(); return 0; }	
 
-	for (uint16_t i = 0; i < ttf.offs_subt.num_tables; i++) {
-		printf("%4.4s : 0x%X\n", ttf.tables_info[i].tag_c, ttf.tables_info[i].offset);
-	}
-
-	printf("GLYF table offset: %X\n", ttf.table_lookup[TrueTypeFontFile::FONT_TABLE_glyf].table_entry->offset);
+	FontTTF ttffont = {};
+	FontTTF::Init(&ttffont, &ttf);
 
 
-	//---------------------------------------------------------head
 
-	HeadTable* head = (HeadTable*)ttf.loadTable(TrueTypeFontFile::FONT_TABLE_head);
-	head->fix_endian();
+	unsigned string_len = 0;
+	char lestring[1000] = { 0 };
+	fgets(lestring, 1000, stdin);
+	string_len = strlen(lestring)-1;
 
 
-	printf("Value of Index To Loc Format: %.4X\n", head->index_to_loc_format);
-
-	//---------------------------------------------------------mapx
-
-	MaxpTable* maxp = (MaxpTable*)ttf.loadTable(TrueTypeFontFile::FONT_TABLE_maxp);
-	maxp->fix_endian();
-
-	//---------------------------------------------------------cmap
-	
-	CmapTable* cmap = (CmapTable*)ttf.loadTable(TrueTypeFontFile::FONT_TABLE_cmap);
-	cmap->fix_endian();
-
-	printf("CMAP: %X\n", cmap);
-	CmapSubtable* unicode_subtable = 0;
-
-	for (uint16_t i = 0; i < cmap->num_subtables; i++) {
-		cmap->entries[i].fix_endian();
-		if (cmap->entries[i].platform_id == CmapEncodingSubtableEntry::PlatformIDs::UNICODE && cmap->entries[i].platform_specific_id >= CmapEncodingSubtableEntry::UnicodeSpecificIDs::UNICODE_2_0_BMPONLY)
-			unicode_subtable = (CmapSubtable*)(((uint8_t*)cmap) + cmap->entries[i].offset);
-		printf("CMAP Table: %u -> %u, with offset 0x%.8X\n", cmap->entries[i].platform_id, cmap->entries[i].platform_specific_id, cmap->entries[i].offset);
-	}
-
-	printf("UNICODE_SUBTABLE: %X\n", unicode_subtable);
-
-	unicode_subtable->fix_endian();
-	printf("unicode subtable version: %u; length: 0x%X\n", unicode_subtable->version, unicode_subtable->length);
-
-	CmapFormat4* unicode_subtable_format4 = (CmapFormat4*)unicode_subtable;
-	unicode_subtable_format4->fix_endian();
-
-	puts("RANGES: ");
-
-	uint16_t ranges = unicode_subtable_format4->seg_count_x2 / 2;
-	for (uint16_t i = 0; i < ranges; i++) {
-		uint16_t* endcodes = unicode_subtable_format4->end_codes;
-		uint16_t* startcodes = &endcodes[ranges + 1];
-		printf("%.4X-%.4X%c", startcodes[i], endcodes[i], i % 2 ? '\n' : ' ');
-	}
-
-	uint16_t rusha = unicode_subtable_format4->GetCheeseGlyphIndex(0x416);  // <----------------------
+	std::vector<FontTTF::RenderedGlyph*> glyph_info(string_len);
+	std::vector<MansInterfacin::UI::Texture2D*> tex(string_len);
+	for (unsigned i = 0; i < string_len; i++) {
+		glyph_info[i] = ttffont.GetTexture(ttffont.UnicodeGlyphLookup(lestring[i]), 28, 2);
 		
-	printf("0x416: the russian thang is glyph index 0x%X or %dd\n", rusha, rusha);
-
-	//---------------------------------------------------------loca
-
-	LocaEntryLong* loca = (LocaEntryLong*)ttf.loadTable(TrueTypeFontFile::FONT_TABLE_loca);
-	for (uint16_t i = 0; i < maxp->num_glyphs; i++) { loca[i].fix_endian(); }
-		
-	for (int i = 0; i < 20; i++) {
-		printf("%d : 0x%.8X\n", i, loca[i].offset);
-	}
-
-	//---------------------------------------------------------glyf
-
-	uint8_t* glyf_table = (uint8_t*)ttf.loadTable(TrueTypeFontFile::FONT_TABLE_glyf);
-
-	GlyfEntry* glyf = (GlyfEntry*)(glyf_table + loca[rusha].offset);
-	glyf->fix_endian();
-
-	GlyfData data_glyf; 
-
-	if (!glyf->getSimpleCoords(data_glyf)) {
-		puts("done fucked up");
-		getchar(); return 0;
-	}
-
-	puts("contours:");
-	for (size_t i = 0, si = 0; i < data_glyf.coords.size(); i++) {
-		if (si < data_glyf.skips.size() && i == data_glyf.skips[si]) {
-			printf(" L ");
-			si++;
-		} else printf(" | ");
-		
-		printf("[%c (%d, %d)\n", 
-			data_glyf.coords[i].on_curve 
-				? '+' 
-				: '*', 
-			data_glyf.coords[i].x, 
-			data_glyf.coords[i].y
+		printf("glyph info: %p -> {%d, %d, %p}\n", glyph_info[i], glyph_info[i]->width, glyph_info[i]->height, glyph_info[i]->texture);
+		tex[i] = elUD->ui.Create2DTexture(
+			glyph_info[i]->width,
+			glyph_info[i]->height,
+			MansInterfacin::UI::ResourceModifyFreq::SOMETIMES,
+			MansInterfacin::UI::Texture2D::TextureFormat::A8,
+			glyph_info[i]->texture
 		);
-		
 	}
 
-	printf("glyf height: %d to %d\n", glyf->y_min, glyf->y_max);
+//___________________________________________________________________________________________________________________________
 
-	uint32_t width = (glyf->x_max - glyf->x_min);
-	uint32_t height = (glyf->y_max - glyf->y_min);
-
-	//array for the totality of the points
-	std::vector<f2coord> whole = std::vector<f2coord>(data_glyf.coords.size());
-	//index of the contour
-	size_t index = 0;
-
-	//for each contour
-	for (auto point : data_glyf.coords) {
-		whole[index++] = {float((point.x - glyf->x_min)), float((point.y - glyf->y_min))};
-	}
-
-	std::vector<uint8_t> endresult(width* height);
-	Nozero(whole, data_glyf.skips, endresult.data(), width, height);
+	float base_x = 1100.f, base_y = 200.f;
+	std::vector<f3coord> font_positions(string_len * 4);
+	std::vector<colortexel> font_cts(string_len * 4);
 	
-	auto tex = elUD->ui.Create2DTexture(width, height, MansInterfacin::UI::ResourceModifyFreq::SOMETIMES, MansInterfacin::UI::Texture2D::TextureFormat::A8, (uint8_t*)endresult.data());
+	for (unsigned i = 0, p = 0; i < string_len; i++, p += 4) {
+		font_positions[p + 0] = { base_x + glyph_info[i]->offset_x,							base_y + glyph_info[i]->offset_y,							0 };
+		font_positions[p + 1] = { base_x + glyph_info[i]->offset_x + glyph_info[i]->width,	base_y + glyph_info[i]->offset_y,							0 };
+		font_positions[p + 2] = { base_x + glyph_info[i]->offset_x,							base_y + glyph_info[i]->offset_y + glyph_info[i]->height,	0 };
+		font_positions[p + 3] = { base_x + glyph_info[i]->offset_x + glyph_info[i]->width,	base_y + glyph_info[i]->offset_y + glyph_info[i]->height,	0 };
 
-	vertexes[0].x += 640;	vertexes[1].x += 640;	vertexes[2].x += 640;	vertexes[3].x += 640;
-	colortexs[0] = { {1, 0, 0, 1}, { 0.0, 1.0 } }; colortexs[1] = { {0, 1, 0, 1}, { 1.0, 1.0 } }; colortexs[2] = { {0, 0, 1, 1}, { 0.0, 0.0 } }; colortexs[3] = { {1, 1, 0, 1}, { 1.0, 0.0 } };
+		font_cts[p + 0] = { {0.8, 0.8, 0.8, 1}, { 0.0, 0.0 } };
+		font_cts[p + 1] = { {0.8, 0.8, 0.8, 1}, { 1.0, 0.0 } };
+		font_cts[p + 2] = { {0.8, 0.8, 0.8, 1}, { 0.0, 1.0 } };
+		font_cts[p + 3] = { {0.8, 0.8, 0.8, 1}, { 1.0, 1.0 } };
+	};
 
-	
-	elUD->ui.UpdateVertexBuffer(buffers[0], (uint8_t*)vertexes.data());
-	elUD->ui.UpdateVertexBuffer(buffers[1], (uint8_t*)colortexs.data());
 
-	elUD->ui.SetVertexBuffers(buffers, 2);
-	elUD->ui.Set2DTexture(tex);
+	MansInterfacin::UI::VertexBuffer* font_buffers[2] = {
+		elUD->ui.CreateVertexBuffer(sizeof(f3coord),	font_positions.size(), MansInterfacin::UI::ResourceModifyFreq::SOMETIMES, (uint8_t*)font_positions.data()),
+		elUD->ui.CreateVertexBuffer(sizeof(colortexel), font_cts      .size(), MansInterfacin::UI::ResourceModifyFreq::SOMETIMES, (uint8_t*)font_cts      .data())
+	};
 
 	elUD->graphics_system.SetRenderFontState();
-	elUD->graphics_system.Draw(4);
-	elUD->graphics_system.PresentFrame();
+
+	elUD->ui.SetVertexBuffers(font_buffers, 2);
+
+
+	float forward = 0;
+	for (unsigned i = 0, offs = 0; i < string_len; forward += 13 + 1, i++, offs += 4) {
+		elUD->ui.Set2DTexture(tex[i]);
+		elUD->graphics_system.SetRenderOffset({ forward, 0, 0 });
+		elUD->graphics_system.Draw(offs, 4);
+	}
 	
 
+	elUD->graphics_system.PresentFrame();
+	
+	//ttffont.GetTexture(ttffont.UnicodeGlyphLookup('|'), 16);
+
 	ttf.close();
+
+	puts("\n\n\n\n");
 
 	getchar();
 

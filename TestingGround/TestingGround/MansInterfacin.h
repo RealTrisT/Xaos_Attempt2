@@ -64,7 +64,8 @@ public:
 		void SetPaintingStencilState(uint8_t stencil_level);
 		void SetNullStencilState();
 		void ClearStencilBuffer();
-
+		
+		void SetRenderOffset(f3coord offs);
 
 		void Draw(UINT vertex_amount) { this->Draw(0, vertex_amount); }
 		void Draw(UINT offset, UINT vertex_amount);
@@ -130,7 +131,6 @@ public:
 		bool UpdateIndexBuffer(IndexBuffer* buffer, uint8_t* data);
 		void SetIndexBuffer(IndexBuffer* buffer);
 		void DestroyIndexBuffer(IndexBuffer* buffer);
-
 
 		GraphicsSystem* graphics_system;
 		std::list<Texture2D> textures   = std::list<Texture2D>();

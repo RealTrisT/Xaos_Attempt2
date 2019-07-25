@@ -100,7 +100,9 @@ void CmapFormat4::fix_endian() {
 	//for (uint16_t i = 0; i < glyfarr_s; i++, current_array++)*current_array = _byteswap_ushort(*current_array);
 }
 
-uint16_t CmapFormat4::GetCheeseGlyphIndex(uint16_t cheese_code){
+uint32_t CmapFormat4::GetCheeseGlyphIndex(uint32_t cheese_code){
+	if (cheese_code >> 16)return 0;
+
 	uint16_t seg_count = this->seg_count_x2 / 2;
 	
 	uint16_t* end_codes			=				this->end_codes;
@@ -369,7 +371,7 @@ enum GlyfFlags {
 	reserved		= 0x80,
 };
 
-bool GlyfEntry::getSimpleCoords(GlyfData& vec){
+bool GlyfEntry::getSimpleCoords(GlyfContours& vec){
 	//if number of contours < 0 it's a compound glyph
 	if (this->num_contours < 0)return false;
 
@@ -397,7 +399,7 @@ bool GlyfEntry::getSimpleCoords(GlyfData& vec){
 	//the total dimension is gonna be the full amount of flags, which represent points, plus the number of contours for the repeated one at the end
 	uint32_t total_dimension = (contour_end_points[this->num_contours - 1] + 1) + this->num_contours;
 	//now we create the vector of vectors
-	vec = { std::vector<GlyfData::GlyfCoords>(total_dimension), std::vector<uint16_t>(this->num_contours) };
+	vec = { std::vector<GlyfContours::GlyfCoords>(total_dimension), std::vector<uint16_t>(this->num_contours) };
 	
 	
 	
@@ -439,7 +441,7 @@ bool GlyfEntry::getSimpleCoords(GlyfData& vec){
 	//	a contour end points index, so we know in which contour we at
 	//  a regular index so we know what we're adding to the stuff
 	//and we loop through the contours
-	GlyfData::GlyfCoords* first = 0;
+	GlyfContours::GlyfCoords* first = 0;
 	for (uint16_t x = 0, point_index = 0, i = 0, si = 0; point_index < flags.size(); point_index++, i++) {
 
 		//we first of all set the on curve bool, since it's now handy to us (we previously didn't have the vectors created)
@@ -503,4 +505,191 @@ bool GlyfEntry::getSimpleCoords(GlyfData& vec){
 	return true;
 }
 
+bool FontTTF::Init(FontTTF* instance, TrueTypeFontFile* ttff){
+#define this instance
+	HeadTable* head = (HeadTable*)ttff->loadTable(TrueTypeFontFile::FONT_TABLE_head);
+	MaxpTable* maxp = (MaxpTable*)ttff->loadTable(TrueTypeFontFile::FONT_TABLE_maxp);
+	void*     vloca =      (void*)ttff->loadTable(TrueTypeFontFile::FONT_TABLE_loca);
+	GlyfEntry* glyf = (GlyfEntry*)ttff->loadTable(TrueTypeFontFile::FONT_TABLE_glyf);
+	CmapTable* cmap = (CmapTable*)ttff->loadTable(TrueTypeFontFile::FONT_TABLE_cmap);
 
+	if (!head || !maxp || !vloca || !glyf || !cmap)return false;
+	head->fix_endian();	maxp->fix_endian(); cmap->fix_endian();
+
+	this->units_per_EM = head->units_per_EM;
+
+	this->x_min = head->x_min; this->y_min = head->y_min; this->x_max = head->x_max; this->y_max = head->y_max;
+
+	for (uint16_t i = 0; i < cmap->num_subtables; i++) {
+		cmap->entries[i].fix_endian();
+		if (
+			cmap->entries[i].platform_id == CmapEncodingSubtableEntry::PlatformIDs::UNICODE
+			&&
+			cmap->entries[i].platform_specific_id >= CmapEncodingSubtableEntry::UnicodeSpecificIDs::UNICODE_2_0_BMPONLY
+		)		{
+			{
+				CmapSubtable* unicode_subtable = (CmapSubtable*)(((uint8_t*)cmap) + cmap->entries[i].offset); unicode_subtable->fix_endian();
+				this->unicode_lookup = (CmapSubtable*)new uint8_t[unicode_subtable->length];
+				memcpy(this->unicode_lookup, unicode_subtable, unicode_subtable->length);
+			}
+			switch (this->unicode_lookup->version) {
+				case 4:{
+					CmapFormat4 * unicode_subtable_f4 = (CmapFormat4*)this->unicode_lookup;
+					unicode_subtable_f4->fix_endian();
+					this->lookup_func = (uint32_t(CmapSubtable::*)(uint32_t cheese_code))&CmapFormat4::GetCheeseGlyphIndex;
+					break;
+				}
+				default: {
+					delete[] this->unicode_lookup;
+					return 0;
+				}
+			}
+		}
+	}
+
+	uint16_t real_number_of_glyphs = 0;
+	this->indexes = new uint16_t[maxp->num_glyphs+1];
+
+	if (head->index_to_loc_format) {
+		LocaEntryLong* loca = (LocaEntryLong*)vloca;
+		for (uint16_t i = 0; i < maxp->num_glyphs; i++) { loca[i].fix_endian();
+			this->indexes[i] = real_number_of_glyphs;
+			if (loca[i].offset != loca[i + 1].offset)real_number_of_glyphs++;
+		}this->indexes[maxp->num_glyphs] = real_number_of_glyphs;
+	}else{
+		LocaEntryShort* loca = (LocaEntryShort*)vloca;
+		for (uint16_t i = 0; i < maxp->num_glyphs; i++) { loca[i].fix_endian();
+			this->indexes[i] = real_number_of_glyphs;
+			if (loca[i].offset != loca[i + 1].offset)real_number_of_glyphs++;
+		}this->indexes[maxp->num_glyphs] = real_number_of_glyphs;
+	}
+	
+	this->glyphs	= new GlyphInfo							[real_number_of_glyphs];
+	this->textures	= new std::vector<RenderedGlyphIndexing>[real_number_of_glyphs];
+
+	if (head->index_to_loc_format) {
+		LocaEntryLong* loca = (LocaEntryLong*)vloca;
+		for (uint16_t i = 0; i < maxp->num_glyphs; i++) {
+			if (loca[i].offset == loca[i + 1].offset)continue;
+			GlyfEntry* glyf_entry = (GlyfEntry*)(((uint8_t*)glyf) + loca[i].offset); glyf_entry->fix_endian();
+			//repeated code repeated code repeated code repeated code repeated code repeated code >
+			this->glyphs[this->indexes[i]] = { glyf_entry->x_min, glyf_entry->y_min, glyf_entry->x_max, glyf_entry->y_max, {} };
+			glyf_entry->getSimpleCoords(this->glyphs[this->indexes[i]].contours);
+			//repeated code repeated code repeated code repeated code repeated code repeated code <
+		}
+	} else {
+		LocaEntryShort* loca = (LocaEntryShort*)vloca;
+		for (uint16_t i = 0; i < maxp->num_glyphs; i++) {
+			GlyfEntry* glyf_entry = (GlyfEntry*)((uint8_t*)glyf + loca[i].offset*2); glyf_entry->fix_endian();
+			//repeated code repeated code repeated code repeated code repeated code repeated code >
+			this->glyphs[i] = { glyf_entry->x_min, glyf_entry->y_min, glyf_entry->x_max, glyf_entry->y_max, {} };
+			glyf_entry->getSimpleCoords(this->glyphs[i].contours);
+			//repeated code repeated code repeated code repeated code repeated code repeated code <
+		}
+	}
+	
+	return true;
+#undef this
+}
+
+
+uint32_t FontTTF::UnicodeGlyphLookup(uint32_t cheese_code) {
+	return (this->unicode_lookup->*this->lookup_func)(cheese_code);
+}
+
+void FontTTF::Term() {
+	delete[] this->glyphs;
+	delete[] this->unicode_lookup;
+}
+
+FontTTF::RenderedGlyph* FontTTF::GetTexture(uint32_t character_index, float pixels_per_em, uint8_t AA_upscale_exponent) {
+	auto& code_point_texture_data = this->textures[character_index];
+	if (code_point_texture_data.size()) {
+		for (RenderedGlyphIndexing& indexed_glyph : code_point_texture_data) {
+			if (indexed_glyph.pixels_per_em == pixels_per_em)return indexed_glyph.data;
+		}
+	}
+	RenderedGlyph* render = new RenderedGlyph();
+
+	GlyphInfo* info = &this->glyphs[character_index];
+
+	uint16_t width_in_units = info->x_max - info->x_min;
+	float width_in_px = float(width_in_units) / float(this->units_per_EM) * pixels_per_em;
+
+	float units_to_pixels_ratio = width_in_px / float(width_in_units);
+
+	float height_in_px = float(info->y_max - info->y_min) * units_to_pixels_ratio;
+
+	render->width  = ceil(width_in_px);
+	render->height = ceil(height_in_px);
+	render->offset_x = info->x_min * units_to_pixels_ratio;
+	render->offset_y =-info->y_max* units_to_pixels_ratio;  //minus y_max because the font is upside down by default, and when we turn it up, we have to push it down
+	render->texture = new uint8_t[render->width * render->height];
+
+	uint8_t* raster_target = render->texture;
+	uint16_t raster_width = render->width;
+	uint16_t raster_height = render->height;
+	uint16_t raster_multiplier = pow(2, AA_upscale_exponent);
+
+	if (AA_upscale_exponent) {
+		raster_width			*= raster_multiplier; 
+		raster_height			*= raster_multiplier;
+		units_to_pixels_ratio	*= raster_multiplier;
+		raster_target = new uint8_t[raster_width * raster_height];
+	}
+
+	size_t index = 0;
+	std::vector<f2coord> contours_f2 = std::vector<f2coord>(info->contours.coords.size());//  flip           fix
+	for (auto point : info->contours.coords)										//         v              v
+		contours_f2[index++] = { float(point.x - info->x_min) * units_to_pixels_ratio, (float(-point.y + info->y_max)) * units_to_pixels_ratio };
+
+	Nozero(contours_f2, info->contours.skips, raster_target, raster_width, raster_height);
+
+
+//	for (uint32_t raster_i = 0; raster_i < raster_width * raster_height; raster_i++) {
+//		if (!(raster_i % raster_width))putchar('\n');
+//		printf("%c ", raster_target[raster_i] ? 'O' : '.');
+//	}
+
+	if (AA_upscale_exponent) {
+
+		float* dangerous_undertaking = new float[render->width*render->height];
+
+		float add_value = 1.f / (raster_multiplier*raster_multiplier);
+		for (uint16_t y = 0; y < render->height; y++) {
+			for (uint16_t x = 0; x < render->width; x++) {
+				float sum = 0.f;
+				for (uint16_t ys = 0; ys < raster_multiplier; ys++) {
+					for (uint16_t xs = 0; xs < raster_multiplier; xs++) {
+						if (raster_target[(y * raster_multiplier + ys) * raster_width + (x * raster_multiplier + xs)])sum += add_value;
+					}
+				}
+				dangerous_undertaking[y * render->width + x] = sum;
+			}
+		}
+
+		/*for (uint32_t render_i = 0; render_i < render->width * render->height; render_i++) {
+			if (!(render_i % render->width))putchar('\n');
+			printf("%c ", raster_target[render_i] == 0 ? ' ' : '0');
+		}*/
+
+		for (uint32_t i = 0; i < render->width * render->height; i++) {
+			render->texture[i] = 255.f * dangerous_undertaking[i];
+		}
+
+		delete[] raster_target;
+		delete[] dangerous_undertaking;
+	}
+
+
+
+
+
+	code_point_texture_data.push_back({ pixels_per_em, render });
+
+	return render;
+}
+
+bool FontTTF::GetRGBA32RenderedGlyphFromUTF8(uint32_t code_point, float pixels_per_em, uint32_t* target, float* offsets){
+	return false;
+}

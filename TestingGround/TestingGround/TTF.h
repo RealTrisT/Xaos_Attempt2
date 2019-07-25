@@ -98,7 +98,7 @@ struct LocaEntryLong {
 
 //-----------------------------------------------------------------------------------------------------------------------Glyf table
 
-struct GlyfData {
+struct GlyfContours {
 	struct GlyfCoords { int16_t x, y; bool on_curve; };
 	std::vector<GlyfCoords> coords;
 	std::vector<uint16_t> skips;
@@ -115,7 +115,7 @@ struct GlyfEntry {
 	VariableGlyfData simple_data[0];
 
 	void fix_endian();
-	bool getSimpleCoords(GlyfData& vec);
+	bool getSimpleCoords(GlyfContours& vec);
 };
 
 //-----------------------------------------------------------------------------------------------------------------------Cmap table
@@ -172,7 +172,7 @@ struct CmapFormat4 : public CmapSubtable {
 
 	void fix_endian();
 
-	uint16_t GetCheeseGlyphIndex(uint16_t cheese_code);
+	uint32_t GetCheeseGlyphIndex(uint32_t cheese_code);
 };
 
 #pragma pack(pop)
@@ -180,6 +180,8 @@ struct CmapFormat4 : public CmapSubtable {
 //-----------------------------------------------------------------------------------------------------------------------Nozero
 
 void Nozero(const std::vector<f2coord>& coords, const std::vector<uint16_t>& skips, uint8_t* result, size_t width, size_t height);
+
+
 
 
 //-----------------------------------------------------------------------------------------------------------------------Font file class
@@ -223,4 +225,51 @@ struct TrueTypeFontFile {
 	LookupEntry table_lookup[48];
 
 	static const uint32_t TagValues[48];
+};
+
+
+
+
+
+
+#include "Font.h"
+
+struct FontTTF : Font {
+	struct GlyphInfo {
+		int16_t x_min;
+		int16_t y_min;
+		int16_t x_max;
+		int16_t y_max;
+		GlyfContours contours;
+	};
+	struct RenderedGlyph {
+		uint8_t* texture;
+		uint16_t width, height;
+		float offset_x, offset_y;
+	};
+	struct RenderedGlyphIndexing {
+		float pixels_per_em;
+		RenderedGlyph* data;
+	};
+
+	uint16_t units_per_EM;
+
+	int16_t x_min;
+	int16_t y_min;
+	int16_t x_max;
+	int16_t y_max;
+	GlyphInfo* glyphs;	//array of glyphs
+	std::vector<RenderedGlyphIndexing>* textures;
+
+	uint16_t* indexes;	//array of indexes
+
+	CmapSubtable* unicode_lookup;
+	uint32_t(CmapSubtable::* lookup_func)(uint32_t cheese_code);
+
+	static bool Init(FontTTF* instance, TrueTypeFontFile* ttff);
+	uint32_t UnicodeGlyphLookup(uint32_t cheese_code);
+	RenderedGlyph* GetTexture(uint32_t character_index, float pixels_per_em, uint8_t AA_upscale_exponent = 0);
+	void Term();
+
+	bool GetRGBA32RenderedGlyphFromUTF8(uint32_t code_point, float pixels_per_em, uint32_t* target, float* offsets);
 };

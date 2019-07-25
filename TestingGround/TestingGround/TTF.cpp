@@ -645,15 +645,9 @@ FontTTF::RenderedGlyph* FontTTF::GetTexture(uint32_t character_index, float pixe
 
 	Nozero(contours_f2, info->contours.skips, raster_target, raster_width, raster_height);
 
-
-//	for (uint32_t raster_i = 0; raster_i < raster_width * raster_height; raster_i++) {
-//		if (!(raster_i % raster_width))putchar('\n');
-//		printf("%c ", raster_target[raster_i] ? 'O' : '.');
-//	}
-
 	if (AA_upscale_exponent) {
 
-		float* dangerous_undertaking = new float[render->width*render->height];
+		float* dangerous_undertaking = new float[render->width*render->height];		//TODO: fix this slow shit omg
 
 		float add_value = 1.f / (raster_multiplier*raster_multiplier);
 		for (uint16_t y = 0; y < render->height; y++) {
@@ -667,11 +661,6 @@ FontTTF::RenderedGlyph* FontTTF::GetTexture(uint32_t character_index, float pixe
 				dangerous_undertaking[y * render->width + x] = sum;
 			}
 		}
-
-		/*for (uint32_t render_i = 0; render_i < render->width * render->height; render_i++) {
-			if (!(render_i % render->width))putchar('\n');
-			printf("%c ", raster_target[render_i] == 0 ? ' ' : '0');
-		}*/
 
 		for (uint32_t i = 0; i < render->width * render->height; i++) {
 			render->texture[i] = 255.f * dangerous_undertaking[i];

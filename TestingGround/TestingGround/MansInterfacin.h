@@ -72,6 +72,8 @@ public:
 		void PresentFrame();
 		void ClearFrame(f4color col);
 
+		bool has_index_buffer = false;
+
 		NativeWindowSystem* WindowSystem;
 		void(*callback_initedgraphics)(GraphicsSystem*);
 

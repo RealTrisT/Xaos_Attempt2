@@ -5,76 +5,14 @@
 #include <vector>
 #include <list>
 
+
+#include <map>
+#include "Datatypes.h"
+#include "FreeType/include/ft2build.h"
+#include FT_FREETYPE_H
+#pragma comment (lib, "FreeType/win32/freetype.lib")
+
 namespace WindowSystem {
-	struct AsciiFont {
-		static void Create(AsciiFont* instance, MansInterfacin::UI::Texture2D* texture, unsigned letter_width, unsigned letter_height) {
-			instance->texture = texture; 
-			instance->letter_width = letter_width;
-			instance->letter_height = letter_height;
-
-			instance->texel_width  = (float)letter_width  / (float)(letter_width*32);
-			instance->texel_height = (float)letter_height / (float)(letter_height*3);
-		}
-		MansInterfacin::UI::Texture2D* texture;
-		unsigned letter_width, letter_height;
-
-		float texel_width, texel_height;
-
-		f2coord PullLetterCoord(char code_point) {
-			code_point -= 32; //because we don't have characters until the 32nd, since those are control characters
-			return { this->texel_width * (code_point % 32), this->texel_height * (code_point / 32) };
-		}
-	};
-	struct AsciiText{
-		static bool Create(AsciiText* instance, AsciiFont* font, char* text, float font_width, MansInterfacin* m) {
-			instance->font = font;
-			instance->font_width = font_width;
-			instance->font_height = font_width * (float)font->letter_height / (float)font->letter_width;
-
-			size_t string_length = strlen(text); //ASSUMING NO CONTROL CHARACTERS FOR NOW
-
-			instance->ascii_buffer = std::vector<f3coord>(4 * string_length);
-			instance->ascii_texture_points = std::vector<colortexel>(4*string_length);
-
-			float current_x = 0, current_y = 0;	//CURRENT Y DOESN'T REALLY MATTER FOR NOW, WERE NOT DOING NEWLINES
-
-			for (size_t i = 0, bffr_i = 0; i < string_length; i++, bffr_i += 4, current_x += +instance->font_width) {
-				instance->ascii_buffer[bffr_i + 0] = { current_x,							current_y + instance->font_height,	0 };
-				instance->ascii_buffer[bffr_i + 1] = { current_x,							current_y,							0 };
-				instance->ascii_buffer[bffr_i + 2] = { current_x + instance->font_width,	current_y + +instance->font_height, 0 };
-				instance->ascii_buffer[bffr_i + 3] = { current_x + instance->font_width,	current_y,							0 };
-
-				f2coord l_tl = font->PullLetterCoord(text[i]); //letter_topleft
-
-				instance->ascii_texture_points[bffr_i + 0].t = { l_tl.x,						l_tl.y + font->texel_height };
-				instance->ascii_texture_points[bffr_i + 1].t = { l_tl.x,						l_tl.y						};
-				instance->ascii_texture_points[bffr_i + 2].t = { l_tl.x + font->texel_width,	l_tl.y + font->texel_height };
-				instance->ascii_texture_points[bffr_i + 3].t = { l_tl.x + font->texel_width,	l_tl.y						};
-			}
-
-			instance->vbuffers[0] = m->ui.CreateVertexBuffer(sizeof(f3coord),    string_length * 4, MansInterfacin::UI::ResourceModifyFreq::SOMETIMES,	(uint8_t*)instance->ascii_buffer.data()			);
-			instance->vbuffers[1] = m->ui.CreateVertexBuffer(sizeof(colortexel), string_length * 4, MansInterfacin::UI::ResourceModifyFreq::SOMETIMES,	(uint8_t*)instance->ascii_texture_points.data()	);
-			
-			return true;
-		}
-
-		void Draw(MansInterfacin* m) {
-			m->ui.Set2DTexture(this->font->texture);
-			m->ui.SetVertexBuffers(this->vbuffers, 2);		//TODO: create a buffer list class for making setbuffers faster
-			m->graphics_system.SetRenderTextureState();
-			m->graphics_system.SetNullStencilState();
-			m->graphics_system.Draw(this->ascii_buffer.size());
-		}
-
-		AsciiFont* font;
-
-		float font_width, font_height;
-
-
-		std::vector<f3coord> ascii_buffer;
-		std::vector<colortexel> ascii_texture_points;
-		MansInterfacin::UI::VertexBuffer* vbuffers[2] = {}; //0 : vertex buffer ; 1 : color and texel buffer
-	};
 
 
 	struct WindowInfo {
@@ -121,84 +59,136 @@ namespace WindowSystem {
 		colortexel bg_and_border_ct[8] = {};
 		MansInterfacin::UI::VertexBuffer* vbuffers[2] = {}; //0 : vertex buffer ; 1 : color and texel buffer
 
-		static void Create(Window* window, WindowInfo* window_info, MansInterfacin* m) {
-			memcpy(&window->window_info, window_info, sizeof(WindowInfo));
+		static void Create(Window* window, WindowInfo* window_info, MansInterfacin* m);
 
-			//------------------------------------background------------------------------------
-			window->bg_and_border_vb[0] = { window_info->pos_x,							window_info->pos_y,							0 };
-			window->bg_and_border_vb[1] = { window_info->pos_x + window_info->width,	window_info->pos_y,							0 };
-			window->bg_and_border_vb[2] = { window_info->pos_x,							window_info->pos_y + window_info->height,	0 };
-			window->bg_and_border_vb[3] = { window_info->pos_x + window_info->width,	window_info->pos_y + window_info->height,	0 };
-			
-			if (window_info->background.background_is_texture) {
-				window->bg_and_border_ct[0].t = window_info->background.texture_info.corner_texel_coords[0];
-				window->bg_and_border_ct[1].t = window_info->background.texture_info.corner_texel_coords[1];
-				window->bg_and_border_ct[2].t = window_info->background.texture_info.corner_texel_coords[2];
-				window->bg_and_border_ct[3].t = window_info->background.texture_info.corner_texel_coords[3];
-			} else {
-				window->bg_and_border_ct[0].c = window_info->background.color_info.color[0];
-				window->bg_and_border_ct[1].c = window_info->background.color_info.color[1];
-				window->bg_and_border_ct[2].c = window_info->background.color_info.color[2];
-				window->bg_and_border_ct[3].c = window_info->background.color_info.color[3];
+		void Draw(MansInterfacin* m);
+	};
+
+	namespace Text {
+		struct RenderedGlyph {
+			unsigned width;
+			unsigned height;
+			signed   advance_x;
+			signed   advance_y;
+			signed	 offs_left;
+			signed   offs_top;
+			MansInterfacin::UI::Texture2D* texture;
+		};
+
+		struct Font {
+			Font(MansInterfacin* g, FT_Face face) : g(g), face(face) { codepoint_map = std::map<uint32_t, RenderedGlyph>(); }
+
+			FT_Face face;
+			MansInterfacin* g;
+			std::map<uint32_t, RenderedGlyph> codepoint_map;
+
+			RenderedGlyph* Get(uint16_t code_point, uint16_t size) {
+				uint32_t key = (((uint32_t)size) << 16) | code_point;
+				auto yeet = codepoint_map.find(key);
+				if (yeet == codepoint_map.end()) {
+					FT_Set_Pixel_Sizes(face, 0, size);
+					if (FT_Load_Char(face, code_point, FT_LOAD_RENDER))return 0;
+					auto& val = codepoint_map[key];
+					val = {
+						face->glyph->bitmap.width,
+						face->glyph->bitmap.rows,
+						face->glyph->advance.x / 64,
+						face->glyph->advance.y / 64,
+						face->glyph->bitmap_left,
+						face->glyph->bitmap_top,
+						face->glyph->bitmap.buffer ?
+							g->ui.Create2DTexture(
+								face->glyph->bitmap.width,
+								face->glyph->bitmap.rows,
+								MansInterfacin::UI::ResourceModifyFreq::NEVER,
+								MansInterfacin::UI::Texture2D::TextureFormat::A8,
+								face->glyph->bitmap.buffer
+							) :
+						0
+					};
+					return &val;
+				}
+				return &yeet->second;
+			}
+		};
+
+		struct RenderableText {
+			RenderableText(Font* font, uint32_t max_size) : font(font), max_size(max_size), coords(std::vector<f3coord>(max_size * 4)), cnt(std::vector<colortexel>(max_size * 4)) {
+				textures = std::vector<MansInterfacin::UI::Texture2D*>(max_size);
+
+				vbuffers[0] = font->g->ui.CreateVertexBuffer(sizeof(f3coord), max_size * 4,    MansInterfacin::UI::ResourceModifyFreq::SOMETIMES, 0);
+				vbuffers[1] = font->g->ui.CreateVertexBuffer(sizeof(colortexel), max_size * 4, MansInterfacin::UI::ResourceModifyFreq::SOMETIMES, 0);
 			}
 
+			uint32_t curr_size = 0;
+			uint32_t max_size;
+			Font* font;
 
-			//------------------------------------borders---------------------------------------
-			if (window_info->has_borders) {
-				window->bg_and_border_vb[4] = { window_info->pos_x - window_info->borders.left,							window_info->pos_y - window_info->borders.top,							0 };
-				window->bg_and_border_vb[5] = { window_info->pos_x + window_info->width + window_info->borders.right,	window_info->pos_y - window_info->borders.top,							0 };
-				window->bg_and_border_vb[6] = { window_info->pos_x - window_info->borders.left,							window_info->pos_y + window_info->height + window_info->borders.bottom,	0 };
-				window->bg_and_border_vb[7] = { window_info->pos_x + window_info->width + window_info->borders.right,	window_info->pos_y + window_info->height + window_info->borders.bottom,	0 };
+			std::vector<f3coord> coords;
+			std::vector<colortexel> cnt;
+			std::vector< MansInterfacin::UI::Texture2D*>textures;
+			MansInterfacin::UI::VertexBuffer* vbuffers[2];
 
-				if (window_info->borders.is_texture) {
-					window->bg_and_border_ct[4].t = window_info->borders.texture_info.corner_texel_coords[0];
-					window->bg_and_border_ct[5].t = window_info->borders.texture_info.corner_texel_coords[1];
-					window->bg_and_border_ct[6].t = window_info->borders.texture_info.corner_texel_coords[2];
-					window->bg_and_border_ct[7].t = window_info->borders.texture_info.corner_texel_coords[3];
-				} else {
-					window->bg_and_border_ct[4].c = window_info->borders.color_info.color[0];
-					window->bg_and_border_ct[5].c = window_info->borders.color_info.color[1];
-					window->bg_and_border_ct[6].c = window_info->borders.color_info.color[2];
-					window->bg_and_border_ct[7].c = window_info->borders.color_info.color[3];
+			bool ReadyString(const char* string, unsigned fontsize, unsigned width_limit, uint32_t(*runner)(const char** curr_ptr) = [](const char** curr_ptr) -> uint32_t {return *((*curr_ptr)++); }) {
+				MansInterfacin* g = font->g;
+
+				unsigned x = 0, y = 0;
+
+				uint32_t index = 0;
+				uint32_t current_codepoint = 0;
+				while ((current_codepoint = runner(&string)) && index < max_size) {
+
+					if (current_codepoint == '\n') {
+						x = 0; 
+						y += font->face->glyph->metrics.vertAdvance / 64; //TODO: very bad, find a way to properly story line size
+						continue; 
+					}
+
+					auto tex = font->Get(current_codepoint, fontsize);
+
+					if (width_limit && x + tex->width > width_limit) {
+						x = 0;
+						y += font->face->glyph->metrics.vertAdvance / 64;
+					}
+
+					textures[index] = tex->texture;
+
+					f3coord* these = &coords[index * 4];
+					these[0] = { float(x) + tex->offs_left				, float(y) - tex->offs_top					, 0 };
+					these[1] = { float(x) + tex->offs_left + tex->width	, float(y) - tex->offs_top					, 0 };
+					these[2] = { float(x) + tex->offs_left				, float(y) - tex->offs_top + tex->height	, 0 };
+					these[3] = { float(x) + tex->offs_left + tex->width	, float(y) - tex->offs_top + tex->height	, 0 };
+
+					colortexel* theze = &cnt[index * 4];
+					theze[0].t = { 0, 0 }; theze[1].t = { 1, 0 }; theze[2].t = { 0, 1 }; theze[3].t = { 1, 1 };
+
+					x += tex->advance_x;
+					y += tex->advance_y;
+					index++;
+				}
+
+				curr_size = index;
+
+				g->ui.UpdateVertexBuffer(vbuffers[0], (uint8_t*)coords.data());
+				g->ui.UpdateVertexBuffer(vbuffers[1], (uint8_t*)cnt.data());
+
+				return 1;
+			}
+
+			void Render() {
+				MansInterfacin* g = font->g;
+				g->graphics_system.SetTopology(MansInterfacin::GraphicsSystem::Topologies::TRIANGLE_STRIP);
+				g->ui.SetIndexBuffer(0);
+				g->ui.SetVertexBuffers(vbuffers, 2);
+				g->graphics_system.SetNullStencilState();
+				g->graphics_system.SetRenderFontState();
+				for (unsigned i = 0; i < curr_size; i++) {
+					g->ui.Set2DTexture(textures[i]);
+					g->graphics_system.Draw(i * 4, 4);
 				}
 			}
-			window->vbuffers[0] = m->ui.CreateVertexBuffer(sizeof(f3coord),		8, MansInterfacin::UI::ResourceModifyFreq::SOMETIMES, (uint8_t*)window->bg_and_border_vb);
-			window->vbuffers[1] = m->ui.CreateVertexBuffer(sizeof(colortexel),	8, MansInterfacin::UI::ResourceModifyFreq::SOMETIMES, (uint8_t*)window->bg_and_border_ct);
-		}
-
-		void Draw(MansInterfacin* m) {
-			m->ui.SetVertexBuffers(vbuffers, 2);
-			m->graphics_system.SetSubtractiveStencilState(1);
-
-			if (this->window_info.background.background_is_texture) {
-				m->graphics_system.SetRenderTextureState();
-				m->ui.Set2DTexture(this->window_info.background.texture_info.texture);
-			}else{
-				m->graphics_system.SetRenderColorState();
-			}
-			
-			m->graphics_system.SetSubtractiveStencilState(1);
-			m->graphics_system.Draw(0, 4);
-			if (window_info.has_borders) {
-				m->graphics_system.SetPaintingStencilState(1);
-				m->graphics_system.Draw(4, 4);
-			}
-			m->graphics_system.ClearStencilBuffer();
-		}
-
-		/*void move_outer(float x, float y);
-		void resize_outer(float x, float y);
-		void move_inner(float x, float y);
-		void resize_inner(float x, float y);*/
-	};
-
-	struct WindowManager {
-		Window* window_list_first;
-		
-		Window* createWindow(WindowInfo* window_info) {
-			
-		}
-	};
+		};
+	}
 };
 
 

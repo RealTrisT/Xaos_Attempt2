@@ -392,7 +392,8 @@ void MansInterfacin::GraphicsSystem::SetRenderOffset(f3coord offs) {
 }
 
 void MansInterfacin::GraphicsSystem::Draw(UINT offset, UINT vertex_amount) {
-	context->Draw(vertex_amount, offset);
+	if (has_index_buffer)context->DrawIndexed(vertex_amount, offset, 0);
+	else				 context->Draw(vertex_amount, offset);
 }
 
 void MansInterfacin::GraphicsSystem::ClearFrame(f4color col) {

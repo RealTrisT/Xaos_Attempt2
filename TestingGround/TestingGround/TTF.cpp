@@ -16,8 +16,8 @@ void DirectoryTableEntry::fix_endian() {
 
 
 void HeadTable::fix_endian() {
-	*(uint32_t*)&this->version				= _byteswap_ulong(*(uint32_t*)&this->version);
-	*(uint32_t*)&this->font_revision		= _byteswap_ulong(*(uint32_t*)&this->font_revision);
+	this->version.fix_endian();
+	this->font_revision.fix_endian();
 	this->checksum_adjustment				= _byteswap_ulong(this->checksum_adjustment);
 	this->magic								= _byteswap_ulong(this->magic);
 	this->flags								= _byteswap_ushort(this->flags);
@@ -96,12 +96,35 @@ void CmapFormat4::fix_endian() {
 		}
 	}
 
-	//and now do all the entries in the glyph index array
+	//and now do all the entries in the glyph index array //TODO: fix this, make it switch endianness off the bat
 	//for (uint16_t i = 0; i < glyfarr_s; i++, current_array++)*current_array = _byteswap_ushort(*current_array);
 }
 
-uint32_t CmapFormat4::GetCheeseGlyphIndex(uint32_t cheese_code){
-	if (cheese_code >> 16)return 0;
+void HheaTable::fix_endian() {
+	this->version.fix_endian();
+	this->ascent					= _byteswap_ushort(this->ascent);
+	this->descent					= _byteswap_ushort(this->descent);
+	this->line_gap					= _byteswap_ushort(this->line_gap);
+	this->advance_width_max			= _byteswap_ushort(this->advance_width_max);
+	this->min_left_side_bearing		= _byteswap_ushort(this->min_left_side_bearing);
+	this->min_right_side_bearing	= _byteswap_ushort(this->min_right_side_bearing);
+	this->x_max_extent				= _byteswap_ushort(this->x_max_extent);
+	this->caret_slope_rise			= _byteswap_ushort(this->caret_slope_rise);
+	this->caret_slope_run			= _byteswap_ushort(this->caret_slope_run);
+	this->caret_offset				= _byteswap_ushort(this->caret_offset);
+	this->metric_data_format		= _byteswap_ushort(this->metric_data_format);
+	this->num_long_hor_metrics		= _byteswap_ushort(this->num_long_hor_metrics);
+}
+
+void HmtxEntry::fix_endian() {
+	this->advance_width				= _byteswap_ushort(this->advance_width);
+	this->left_side_bearing			= _byteswap_ushort(this->left_side_bearing);
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////// CMAP FORMAT 4 -> GLYPH INDEX
+FontTTF::GlyphID CmapFormat4::GetCheeseGlyphIndex(uint32_t cheese_code){
+	if (cheese_code >> 16)return 0; //format 4 only supports basic multilingual plane
 
 	uint16_t seg_count = this->seg_count_x2 / 2;
 	
@@ -125,6 +148,8 @@ uint32_t CmapFormat4::GetCheeseGlyphIndex(uint32_t cheese_code){
 		return _byteswap_ushort(*(&id_range_offss[i] + (cheese_code - start_codes[i]) + id_range_offss[i]/2));
 	}
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////// TRUETYPEFILE -> OPEN
 
 bool TrueTypeFontFile::Open(TrueTypeFontFile* instance, const char* path) {
 		#define this instance
@@ -181,10 +206,12 @@ bool TrueTypeFontFile::Open(TrueTypeFontFile* instance, const char* path) {
 		#undef this
 }
 
-
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////// TRUETYPEFILE -> CLOSE
 void TrueTypeFontFile::close() { 
 	fclose(this->file); 
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////  TRUETYPEFILE -> LOAD TABLE (or return loaded table)
 
 void* TrueTypeFontFile::loadTable(TableTypes type){  //TODO deallocate the shit allocated here
 	auto& tl = this->table_lookup[type];
@@ -199,6 +226,8 @@ void* TrueTypeFontFile::loadTable(TableTypes type){  //TODO deallocate the shit 
 	return 0;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////  TRUETYPEFILE -> TAG VALUES
+
 const uint32_t TrueTypeFontFile::TagValues[] = {
 	0x00000000 /*UNKNOWN*/,
 	0x45425343 /*EBSC*/,	0x4F532F32 /*OS/2*/,	0x5A617066 /*Zapf*/,
@@ -209,7 +238,7 @@ const uint32_t TrueTypeFontFile::TagValues[] = {
 	0x666D7478 /*fmtx*/,	0x666F6E64 /*fond*/,	0x6670676D /*fpgm*/,
 	0x66766172 /*fvar*/,	0x67617370 /*gasp*/,	0x67636964 /*gcid*/,
 	0x676C7966 /*glyf*/,	0x67766172 /*gvar*/,	0x68646D78 /*hdmx*/,
-	0x68656164 /*head*/,	0x68686561 /*hhea*/,	0x68746D78 /*htmx*/,
+	0x68656164 /*head*/,	0x68686561 /*hhea*/,	0x686D7478 /*hmtx*/,
 	0x6A757374 /*just*/,	0x6B65726E /*kern*/,	0x6B657278 /*kerx*/,
 	0x6C636172 /*lcar*/,	0x6C6F6361 /*loca*/,	0x6C746167 /*ltag*/,
 	0x6D617870 /*maxp*/,	0x6D657461 /*meta*/,	0x6D6F7274 /*mort*/,
@@ -219,136 +248,6 @@ const uint32_t TrueTypeFontFile::TagValues[] = {
 	0x766D7478 /*vmtx*/,	0x78726566 /*xref*/,
 };
 
-
-
-void Nozero(const std::vector<f2coord>& coords, const std::vector<uint16_t>& skips, uint8_t *result, size_t width, size_t height){
-	//line segment
-	struct line {
-		//the 2 points that constitute the line segment
-		f2coord p[2];
-		//whether or not the line is going down (so if the y of the first point is > than the y of the second)
-		bool down;
-
-		//equation data
-		struct {
-			//whether or not it's vertical, since if that was the case the equation would be undefined
-			bool vertical;
-			//a union, since we're only gonna be using one of the 2, no need for wasting space
-			union {
-				//variables of the equation
-				struct {
-					float m;
-					float b;
-				};
-				//the x in cas it's vertical. This can already be taken from one of the points, but it's not a waste of space either sine it's a union, so just for convenience
-				float x;
-			};
-		}eq;
-	};
-
-	/////////////////////////////////////// Start Of Code
-
-	//line vector
-	std::vector<line> lines(coords.size() - skips.size());
-
-	//so first we establish a vector with all of the line data, for every line
-	
-	size_t li = 0;
-
-
-	for (size_t i = 0, si = 0; i < coords.size() - 1; i++) {
-
-		//if this point is a skip, don't add it as a line
-		if (si != skips.size() && i == skips[si]) { si++; continue; }
-
-		//build the object
-		lines[li].p[0] = coords[i + 0];
-		lines[li].p[1] = coords[i + 1];
-		lines[li].down = coords[i + 0].y < coords[i + 1].y;
-
-		if (lines[li].p[0].x == lines[li].p[1].x) {
-			lines[li].eq.vertical = true;
-			lines[li].eq.x = lines[li].p[0].x;
-		} else {
-			lines[li].eq.m = (lines[li].p[0].y - lines[li].p[1].y) / (lines[li].p[0].x - lines[li].p[1].x);
-			lines[li].eq.b = lines[li].eq.m * (-lines[li].p[0].x) + lines[li].p[0].y;
-		}li++;//increment line index
-
-	}
-
-	//////////////////////////////// Filling the segments array with info regarding the lines
-
-	//current size of the line array
-	size_t lines_curr_size = 0;
-	//line array
-	std::vector<line> lines_current(lines.size());
-	//which will have a maximum capacity of
-
-	//now for every row
-	for (size_t y = 0; y < height; y++) {
-		
-		//y position, which is going to be the middle of the pixel (which is a square)
-		float y_pix_center = float(y) + 0.5f;
-
-		//reset the size of our line array
-		lines_curr_size = 0;
-		//and add all the lines that apply to our current Y value
-		for (auto& line : lines) {
-			if (
-				(line.p[0].y <= y_pix_center && line.p[1].y >= y_pix_center) 
-				||
-				(line.p[0].y >= y_pix_center && line.p[1].y <= y_pix_center)
-			)
-			lines_current[lines_curr_size++] = line;
-		}
-		
-
-		//now this is the fun part. we have the lines_current array, which will be overridden for every y axis
-		//this is because we don't want to compare every line in the geometry every single pixel generally speaking,
-		//so we exclude all the ones that are not part of our y axis from being compared to the points
-		
-		//and because we will be doing a horizontal scan, it's also useless to keep in that array the lines that are past us
-		//but that's a problem, because removing stuff from arrays is a pain in the ass, since it often means that you have to
-		//copy all the following memory backwards, in order to occupy the vaccant position. In this case though, we only use 
-		//the array once, so what I decided to do is override the "deleted" element with the one in the start of the array, and
-		//next time the array is iterated, we start at element 1 instead of 0, in order not to take the "deleted" one into account
-		//this is ok since we don't care for order in this particular case.
-
-		int processed = 0;
-
-		//now for each of the pixels in the row
-		int touchy = 0;
-		for (size_t x = 0, line_starters = 0; x < width; x++) {
-
-			float x_pix_center = float(x) + 0.5f;
-
-			for (size_t i = line_starters; i < lines_curr_size && line_starters < lines_curr_size; i++) {
-				line& cl = lines_current[i];
-				
-				//if we have passed one of the segments, remove it from the vector and increment/decrement the state appropriately
-				if (x_pix_center < cl.p[0].x && x_pix_center < cl.p[1].x)continue; 
-
-				if (
-					(x_pix_center > cl.p[0].x && x_pix_center > cl.p[1].x)
-					||
-					(cl.eq.vertical && x_pix_center >= cl.eq.x)
-					||
-					(x_pix_center > ((y_pix_center - cl.eq.b) / cl.eq.m))
-				) {
-					touchy += cl.down ? -1 : 1;
-
-					//if the one we want to delete is the "first", then we just increment the index of the line_starters and
-					//the real array index. Otherwise we just don't increase the real index so we stay in the same place, which
-					//wil have a new element there
-					if (line_starters == i)	line_starters++;
-					else					lines_current[i--] = lines_current[line_starters++];
-				}
-			}
-
-			*(result++) = (touchy)?0xFF:0;
-		}
-	}
-}
 
 enum GlyfFlags {
 	//1 -> is on the curve, 0 is not on the curve
@@ -496,7 +395,7 @@ bool GlyfEntry::getSimpleCoords(GlyfContours& vec){
 		//if we've found the end of a contour
 		if (si != this->num_contours && point_index == contour_end_points[si]) {
 			//add the closing point to it
-			vec.coords[++i].y = vec.coords[(si) ? vec.skips[si - 1] + 1 : 0].y;
+			vec.coords[++i] = vec.coords[(si) ? vec.skips[si - 1] + 1 : 0];
 			//and move on
 			si++;
 		}		
@@ -512,11 +411,14 @@ bool FontTTF::Init(FontTTF* instance, TrueTypeFontFile* ttff){
 	void*     vloca =      (void*)ttff->loadTable(TrueTypeFontFile::FONT_TABLE_loca);
 	GlyfEntry* glyf = (GlyfEntry*)ttff->loadTable(TrueTypeFontFile::FONT_TABLE_glyf);
 	CmapTable* cmap = (CmapTable*)ttff->loadTable(TrueTypeFontFile::FONT_TABLE_cmap);
+	HheaTable* hhea = (HheaTable*)ttff->loadTable(TrueTypeFontFile::FONT_TABLE_hhea);
+	HmtxEntry* hmtx = (HmtxEntry*)ttff->loadTable(TrueTypeFontFile::FONT_TABLE_hmtx);
 
-	if (!head || !maxp || !vloca || !glyf || !cmap)return false;
-	head->fix_endian();	maxp->fix_endian(); cmap->fix_endian();
+	if (!head || !maxp || !vloca || !glyf || !cmap || !hhea || !hmtx)return false;
+	head->fix_endian();	maxp->fix_endian(); cmap->fix_endian(); hhea->fix_endian();
 
 	this->units_per_EM = head->units_per_EM;
+	this->line_gap = hhea->line_gap;
 
 	this->x_min = head->x_min; this->y_min = head->y_min; this->x_max = head->x_max; this->y_max = head->y_max;
 
@@ -536,7 +438,7 @@ bool FontTTF::Init(FontTTF* instance, TrueTypeFontFile* ttff){
 				case 4:{
 					CmapFormat4 * unicode_subtable_f4 = (CmapFormat4*)this->unicode_lookup;
 					unicode_subtable_f4->fix_endian();
-					this->lookup_func = (uint32_t(CmapSubtable::*)(uint32_t cheese_code))&CmapFormat4::GetCheeseGlyphIndex;
+					this->lookup_func = (GlyphID(CmapSubtable::*)(uint32_t cheese_code))&CmapFormat4::GetCheeseGlyphIndex;
 					break;
 				}
 				default: {
@@ -587,7 +489,30 @@ bool FontTTF::Init(FontTTF* instance, TrueTypeFontFile* ttff){
 			//repeated code repeated code repeated code repeated code repeated code repeated code <
 		}
 	}
-	
+
+	this->adv_widths_count = hhea->num_long_hor_metrics;
+	this->adv_widths = new uint16_t[this->adv_widths_count];
+
+	if (head->flags & 1) {
+		this->leftside_bearings = 0;
+
+		for (uint16_t i = 0; i < this->adv_widths_count; i++) {
+			hmtx[i].fix_endian();
+			this->adv_widths[i] = hmtx[i].advance_width;
+		}
+	} else {
+		this->leftside_bearings = new int16_t[maxp->num_glyphs];
+
+		for (uint16_t i = 0; i < this->adv_widths_count; i++) {
+			hmtx[i].fix_endian();
+			this->adv_widths[i] = hmtx[i].advance_width;
+			this->leftside_bearings[i] = hmtx[i].left_side_bearing;
+		}for (uint16_t i = 0, *LSBs = (uint16_t*)&hmtx[this->adv_widths_count]; i < maxp->num_glyphs - this->adv_widths_count; i++) {
+			this->leftside_bearings[i] = LSBs[i];
+		}
+
+	}
+
 	return true;
 #undef this
 }
@@ -602,76 +527,60 @@ void FontTTF::Term() {
 	delete[] this->unicode_lookup;
 }
 
-FontTTF::RenderedGlyph* FontTTF::GetTexture(uint32_t character_index, float pixels_per_em, uint8_t AA_upscale_exponent) {
-	auto& code_point_texture_data = this->textures[character_index];
+#include "Bezier.h"
+#include "Nozero.h"
+//TODO: implement the whole bezier shit
+FontTTF::RenderedGlyph* FontTTF::GetTexture(GlyphID glyph_index, float pixels_per_em, uint8_t AA_upscale_multiplier) {
+	
+	auto& code_point_texture_data = this->textures[glyph_index];
 	if (code_point_texture_data.size()) {
 		for (RenderedGlyphIndexing& indexed_glyph : code_point_texture_data) {
 			if (indexed_glyph.pixels_per_em == pixels_per_em)return indexed_glyph.data;
 		}
 	}
+
+	GlyphInfo* info = &this->glyphs[this->indexes[glyph_index]];
+
 	RenderedGlyph* render = new RenderedGlyph();
 
-	GlyphInfo* info = &this->glyphs[character_index];
+	float units_to_pixels_ratio = pixels_per_em / float(this->units_per_EM);
 
-	uint16_t width_in_units = info->x_max - info->x_min;
-	float width_in_px = float(width_in_units) / float(this->units_per_EM) * pixels_per_em;
-
-	float units_to_pixels_ratio = width_in_px / float(width_in_units);
-
+	float width_in_px = float(info->x_max - info->x_min) * units_to_pixels_ratio;
 	float height_in_px = float(info->y_max - info->y_min) * units_to_pixels_ratio;
 
 	render->width  = ceil(width_in_px);
 	render->height = ceil(height_in_px);
-	render->offset_x = info->x_min * units_to_pixels_ratio;
-	render->offset_y =-info->y_max* units_to_pixels_ratio;  //minus y_max because the font is upside down by default, and when we turn it up, we have to push it down
+	render->offset_x = ((this->leftside_bearings)?this->leftside_bearings[glyph_index]:info->x_min) * units_to_pixels_ratio;
+	render->offset_y = -float(info->y_max) * units_to_pixels_ratio;  //minus y_max because the font is upside down by default, and when we turn it up, we have to push it down
+	render->advance_width = float((glyph_index < this->adv_widths_count) ? this->adv_widths[glyph_index] : this->adv_widths[this->adv_widths_count - 1]) * units_to_pixels_ratio;
+
+	if (!info->contours.coords.size()) {
+		render->texture = 0;
+		code_point_texture_data.push_back({ pixels_per_em, render });
+		return render;
+	}
+	
 	render->texture = new uint8_t[render->width * render->height];
 
-	uint8_t* raster_target = render->texture;
-	uint16_t raster_width = render->width;
-	uint16_t raster_height = render->height;
-	uint16_t raster_multiplier = pow(2, AA_upscale_exponent);
+	std::vector<f2coord> contours_f2 = std::vector<f2coord>(info->contours.coords.size());
 
-	if (AA_upscale_exponent) {
-		raster_width			*= raster_multiplier; 
-		raster_height			*= raster_multiplier;
-		units_to_pixels_ratio	*= raster_multiplier;
-		raster_target = new uint8_t[raster_width * raster_height];
-	}
-
-	size_t index = 0;
-	std::vector<f2coord> contours_f2 = std::vector<f2coord>(info->contours.coords.size());//  flip           fix
-	for (auto point : info->contours.coords)										//         v              v
-		contours_f2[index++] = { float(point.x - info->x_min) * units_to_pixels_ratio, (float(-point.y + info->y_max)) * units_to_pixels_ratio };
-
-	Nozero(contours_f2, info->contours.skips, raster_target, raster_width, raster_height);
-
-	if (AA_upscale_exponent) {
-
-		float* dangerous_undertaking = new float[render->width*render->height];		//TODO: fix this slow shit omg
-
-		float add_value = 1.f / (raster_multiplier*raster_multiplier);
-		for (uint16_t y = 0; y < render->height; y++) {
-			for (uint16_t x = 0; x < render->width; x++) {
-				float sum = 0.f;
-				for (uint16_t ys = 0; ys < raster_multiplier; ys++) {
-					for (uint16_t xs = 0; xs < raster_multiplier; xs++) {
-						if (raster_target[(y * raster_multiplier + ys) * raster_width + (x * raster_multiplier + xs)])sum += add_value;
-					}
-				}
-				dangerous_undertaking[y * render->width + x] = sum;
-			}
-		}
-
-		for (uint32_t i = 0; i < render->width * render->height; i++) {
-			render->texture[i] = 255.f * dangerous_undertaking[i];
-		}
-
-		delete[] raster_target;
-		delete[] dangerous_undertaking;
+	for (size_t index = 0; index < contours_f2.size();)	{
+		//opoint: original point at start of iteration; point: temp point pointer
+		GlyfContours::GlyfCoords* opoint = &info->contours.coords[index], * point = opoint;
+		//original contour translated point
+		f2coord* oc = &contours_f2[index];
+		
+		//now we loop, if the current point is a control point, we do the next (which won't 		  flip           fix
+		//be) as well, this is so we can then do a bezier using the info of the next point			   v              v
+		do contours_f2[index++] = { float(point->x - info->x_min) * units_to_pixels_ratio, (float(-point->y + info->y_max)) * units_to_pixels_ratio }; while (!(point++)->on_curve);
+		//now if is in fact a control point, just make it into the halfway point of the quadratic bezier
+		if (!opoint->on_curve) *oc = Bezier::Quadratic(oc[-1], oc[0], oc[1], 0.5f);
 	}
 
 
-
+	std::vector<std::vector<float>> rays(render->height * AA_upscale_multiplier);
+	Nozero_Rays(contours_f2, info->contours.skips, rays, render->width, render->height, AA_upscale_multiplier);
+	Nozero_AA(rays, render->texture, render->width, render->height, AA_upscale_multiplier);
 
 
 	code_point_texture_data.push_back({ pixels_per_em, render });

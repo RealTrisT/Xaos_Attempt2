@@ -115,8 +115,12 @@ bool MansInterfacin::UI::Update2DTexture(Texture2D* texture, uint8_t* buffer){
 }
 
 void MansInterfacin::UI::Set2DTexture(Texture2D* texture){
-	if (!texture)return;
-	this->graphics_system->context->PSSetShaderResources(0, 1, &texture->d3d_obj_resourceview);
+	if (!texture) {
+		ID3D11ShaderResourceView* dummy = 0;
+		this->graphics_system->context->PSSetShaderResources(0, 1, &dummy);
+	} else {
+		this->graphics_system->context->PSSetShaderResources(0, 1, &texture->d3d_obj_resourceview);
+	}
 }
 
 void MansInterfacin::UI::Destroy2DTexture(Texture2D* texture) {  //TODO: Fix this for when the texture is in use. Worth mentioning as well that release has a return value. This should be bool.
@@ -261,6 +265,7 @@ const DXGI_FORMAT index_buffer_format_from_size[5] = {
 void MansInterfacin::UI::SetIndexBuffer(IndexBuffer* buffer){
 	if (!buffer)this->graphics_system->context->IASetIndexBuffer(0, (DXGI_FORMAT)0, 0);
 	else		this->graphics_system->context->IASetIndexBuffer(buffer->d3d_obj, index_buffer_format_from_size[buffer->element_size], 0);
+	this->graphics_system->has_index_buffer = buffer;
 }
 
 void MansInterfacin::UI::DestroyIndexBuffer(IndexBuffer* buffer){

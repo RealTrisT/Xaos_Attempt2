@@ -19,6 +19,9 @@
     <Filter Include="Header Files\UI stuff">
       <UniqueIdentifier>{3921dc96-970c-45bf-9c10-a97688dc22db}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Processes_andsuch">
+      <UniqueIdentifier>{6cebbaa2-e1e3-4a54-8f17-c7d45da209fe}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -48,6 +51,15 @@
     <ClCompile Include="Font.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Bezier.cpp">
+      <Filter>Source Files\UI stuff</Filter>
+    </ClCompile>
+    <ClCompile Include="Nozero.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="next.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Targa.h">
@@ -67,6 +79,15 @@
     </ClInclude>
     <ClInclude Include="Font.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Bezier.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Nozero.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Cmd.h">
+      <Filter>Header Files\Processes_andsuch</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

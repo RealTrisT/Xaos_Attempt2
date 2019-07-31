@@ -9,9 +9,10 @@
 //-----------------------------------------------------------------------------------------------------------------------TYPES
 
 //fixed point number with 16 bits for integer and 16 for decimal
-typedef struct { uint16_t first, second; } Fixed;
+typedef struct { uint16_t first, second; void fix_endian() { first = _byteswap_ushort(first); second = _byteswap_ushort(second); } } Fixed;
 //Font Word, represents font units aka EM - which was orignally used in the press as a measure of printers, and is represented by the width of an upper case M
 typedef int16_t FWord;
+typedef uint16_t uFWord;
 
 //-----------------------------------------------------------------------------------------------------------------------Offset subtable
 
@@ -172,17 +173,35 @@ struct CmapFormat4 : public CmapSubtable {
 
 	void fix_endian();
 
-	uint32_t GetCheeseGlyphIndex(uint32_t cheese_code);
+	uint16_t GetCheeseGlyphIndex(uint32_t cheese_code);
 };
 
+//-----------------------------------------------------------------------------------------------------------------------Hhea table
+
+struct HheaTable {
+	Fixed version;
+	FWord ascent;
+	FWord descent;
+	FWord line_gap;
+	uFWord advance_width_max;
+	FWord min_left_side_bearing;
+	FWord min_right_side_bearing;
+	FWord x_max_extent;
+	int16_t caret_slope_rise;
+	int16_t caret_slope_run;
+	FWord caret_offset;
+	int16_t reserved[4];
+	int16_t metric_data_format;
+	uint16_t num_long_hor_metrics;
+	void fix_endian();
+};
+
+struct HmtxEntry {
+	uint16_t advance_width;
+	int16_t left_side_bearing;
+	void fix_endian();
+};
 #pragma pack(pop)
-
-//-----------------------------------------------------------------------------------------------------------------------Nozero
-
-void Nozero(const std::vector<f2coord>& coords, const std::vector<uint16_t>& skips, uint8_t* result, size_t width, size_t height);
-
-
-
 
 //-----------------------------------------------------------------------------------------------------------------------Font file class
 
@@ -197,7 +216,7 @@ struct TrueTypeFontFile {
 		FONT_TABLE_fmtx, FONT_TABLE_fond, FONT_TABLE_fpgm,
 		FONT_TABLE_fvar, FONT_TABLE_gasp, FONT_TABLE_gcid,
 		FONT_TABLE_glyf, FONT_TABLE_gvar, FONT_TABLE_hdmx,
-		FONT_TABLE_head, FONT_TABLE_hhea, FONT_TABLE_htmx,
+		FONT_TABLE_head, FONT_TABLE_hhea, FONT_TABLE_hmtx,
 		FONT_TABLE_just, FONT_TABLE_kern, FONT_TABLE_kerx,
 		FONT_TABLE_lcar, FONT_TABLE_loca, FONT_TABLE_ltag,
 		FONT_TABLE_maxp, FONT_TABLE_meta, FONT_TABLE_mort,
@@ -214,8 +233,6 @@ struct TrueTypeFontFile {
 	void close();
 
 	void* loadTable(TableTypes type);
-
-
 
 
 	FILE* file;
@@ -235,6 +252,7 @@ struct TrueTypeFontFile {
 #include "Font.h"
 
 struct FontTTF : Font {
+	typedef uint16_t GlyphID;
 	struct GlyphInfo {
 		int16_t x_min;
 		int16_t y_min;
@@ -246,29 +264,33 @@ struct FontTTF : Font {
 		uint8_t* texture;
 		uint16_t width, height;
 		float offset_x, offset_y;
+		float advance_width;
 	};
 	struct RenderedGlyphIndexing {
 		float pixels_per_em;
 		RenderedGlyph* data;
 	};
 
-	uint16_t units_per_EM;
+	
+	uint16_t units_per_EM;							//how many units the font does per font's height, could be seen as "resolution"
+	int16_t x_min, y_min;							//minimum font point coord
+	int16_t x_max, y_max;							//maximum font point coord
+	uint16_t line_gap; float GetLineGap(float pixels_per_em) {return pixels_per_em / float(this->units_per_EM) * float(this->line_gap); }
+	
+	GlyphInfo* glyphs;								//array of glyphs, contains dimensions and contours
+	std::vector<RenderedGlyphIndexing>* textures;	//array of textures for each glyph, each entry for each glyph represents a size
+	uint16_t* indexes;								//loca table indexes to actual glyphs translation, not all loca entries have a dedicated glyph, some are shared  i.e. whitespace characters
+	
+	uint16_t  adv_widths_count;						//amount of advance widths in adv_widths
+	uint16_t* adv_widths;							//array with the advancement widths for each character, if we're trying to get an advancement width at glyphID >= adv_widths, then the advancement width is adv_widths[adv_widths_count-1]
+	int16_t*  leftside_bearings;					//the left side bearings for each character, this is zero if all entries in file are derived from x_min in the corresponding glyph
 
-	int16_t x_min;
-	int16_t y_min;
-	int16_t x_max;
-	int16_t y_max;
-	GlyphInfo* glyphs;	//array of glyphs
-	std::vector<RenderedGlyphIndexing>* textures;
-
-	uint16_t* indexes;	//array of indexes
-
-	CmapSubtable* unicode_lookup;
-	uint32_t(CmapSubtable::* lookup_func)(uint32_t cheese_code);
+	CmapSubtable* unicode_lookup;									//carbon copy of the unicode cmap subtable, lookup_func is a pointer to a function that reads the specific format, UnicodeGlyphLookup should be used
+	GlyphID(CmapSubtable::* lookup_func)(uint32_t cheese_code);	//member function pointer to the function that reads the specific format of the subtable in question
 
 	static bool Init(FontTTF* instance, TrueTypeFontFile* ttff);
 	uint32_t UnicodeGlyphLookup(uint32_t cheese_code);
-	RenderedGlyph* GetTexture(uint32_t character_index, float pixels_per_em, uint8_t AA_upscale_exponent = 0);
+	RenderedGlyph* GetTexture(GlyphID glyph_index, float pixels_per_em, uint8_t AA_upscale_exponent = 0);
 	void Term();
 
 	bool GetRGBA32RenderedGlyphFromUTF8(uint32_t code_point, float pixels_per_em, uint32_t* target, float* offsets);

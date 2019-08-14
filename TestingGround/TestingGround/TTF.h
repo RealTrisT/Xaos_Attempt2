@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "TracedException.h"
 #include "Datatypes.h"
 
 //-----------------------------------------------------------------------------------------------------------------------TYPES
@@ -88,11 +89,13 @@ struct MaxpTable {	//TODO: implement version 1.0
 //-----------------------------------------------------------------------------------------------------------------------Loca table
 
 struct LocaEntryShort {
+	uint32_t GetOffset() { return offset * 2; }
 	uint16_t offset;
 	void fix_endian() { this->offset = _byteswap_ushort(this->offset); }
 };
 
 struct LocaEntryLong {
+	uint32_t GetOffset() { return offset; }
 	uint32_t offset;
 	void fix_endian() { this->offset = _byteswap_ulong(this->offset); }
 };
@@ -103,6 +106,7 @@ struct GlyfContours {
 	struct GlyfCoords { int16_t x, y; bool on_curve; };
 	std::vector<GlyfCoords> coords;
 	std::vector<uint16_t> skips;
+	std::vector<uint8_t> instructions;
 };
 
 struct GlyfEntry {
@@ -203,6 +207,16 @@ struct HmtxEntry {
 };
 #pragma pack(pop)
 
+//-----------------------------------------------------------------------------------------------------------------------Hinting
+
+/*#include "RestrictedPointer.h"
+struct HintEngine {
+	uint8_t* stack_data;
+	RestrictedPointer<uint8_t> stack_p;
+
+	
+};*/
+
 //-----------------------------------------------------------------------------------------------------------------------Font file class
 
 struct TrueTypeFontFile {
@@ -225,14 +239,14 @@ struct TrueTypeFontFile {
 		FONT_TABLE_sbix, FONT_TABLE_trak, FONT_TABLE_vhea,
 		FONT_TABLE_vmtx, FONT_TABLE_xref,
 	};
-
 	struct LookupEntry { DirectoryTableEntry* table_entry; void* table_data; };
 
-
-	static bool Open(TrueTypeFontFile* instance, const char* path);
-	void close();
+	TrueTypeFontFile(const char* path);
+	~TrueTypeFontFile();
 
 	void* loadTable(TableTypes type);
+	void close();
+
 
 
 	FILE* file;
@@ -252,6 +266,11 @@ struct TrueTypeFontFile {
 #include "Font.h"
 
 struct FontTTF : Font {
+
+	//---
+	//----			definitions
+	//---
+
 	typedef uint16_t GlyphID;
 	struct GlyphInfo {
 		int16_t x_min;
@@ -271,6 +290,28 @@ struct FontTTF : Font {
 		RenderedGlyph* data;
 	};
 
+	//---
+	//----			functions
+	//---
+
+	FontTTF(TrueTypeFontFile* ttff);
+	~FontTTF();
+private:
+	void InitCmap(CmapTable* cmap);
+	template<class loca_type> uint16_t InitIndexes(loca_type* loca, MaxpTable* maxp);
+	template<class loca_type> void InitGlyphs(loca_type* loca, GlyfEntry* glyf, MaxpTable* maxp, uint16_t nr_glyphs);
+	void InitHorMetrics(MaxpTable* maxp, HheaTable* hhea, HeadTable* head, HmtxEntry* hmtx);
+public:
+
+	uint32_t UnicodeGlyphLookup(uint32_t cheese_code);
+	RenderedGlyph* GetTexture(GlyphID glyph_index, float pixels_per_em, uint8_t AA_upscale_exponent = 0);
+	void Term();
+
+	bool GetRGBA32RenderedGlyphFromUTF8(uint32_t code_point, float pixels_per_em, uint32_t* target, float* offsets);
+
+	//---
+	//----			data
+	//---
 	
 	uint16_t units_per_EM;							//how many units the font does per font's height, could be seen as "resolution"
 	int16_t x_min, y_min;							//minimum font point coord
@@ -288,10 +329,4 @@ struct FontTTF : Font {
 	CmapSubtable* unicode_lookup;									//carbon copy of the unicode cmap subtable, lookup_func is a pointer to a function that reads the specific format, UnicodeGlyphLookup should be used
 	GlyphID(CmapSubtable::* lookup_func)(uint32_t cheese_code);	//member function pointer to the function that reads the specific format of the subtable in question
 
-	static bool Init(FontTTF* instance, TrueTypeFontFile* ttff);
-	uint32_t UnicodeGlyphLookup(uint32_t cheese_code);
-	RenderedGlyph* GetTexture(GlyphID glyph_index, float pixels_per_em, uint8_t AA_upscale_exponent = 0);
-	void Term();
-
-	bool GetRGBA32RenderedGlyphFromUTF8(uint32_t code_point, float pixels_per_em, uint32_t* target, float* offsets);
 };

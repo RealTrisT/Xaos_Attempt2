@@ -22,11 +22,14 @@
     <Filter Include="Header Files\Processes_andsuch">
       <UniqueIdentifier>{6cebbaa2-e1e3-4a54-8f17-c7d45da209fe}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\utils">
+      <UniqueIdentifier>{f18a3b4e-d09e-45d4-9efb-d878c14dc34e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\main">
+      <UniqueIdentifier>{26d0ddb7-687e-433c-aacd-859610c8944f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="MansInterfacin.cpp">
       <Filter>Source Files\UI stuff</Filter>
     </ClCompile>
@@ -57,8 +60,17 @@
     <ClCompile Include="Nozero.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="next.cpp">
+    <ClCompile Include="TracedException.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files\main</Filter>
+    </ClCompile>
+    <ClCompile Include="next.cpp">
+      <Filter>Source Files\main</Filter>
+    </ClCompile>
+    <ClCompile Include="next2.cpp">
+      <Filter>Source Files\main</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -88,6 +100,12 @@
     </ClInclude>
     <ClInclude Include="Cmd.h">
       <Filter>Header Files\Processes_andsuch</Filter>
+    </ClInclude>
+    <ClInclude Include="TracedException.h">
+      <Filter>Header Files\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="RestrictedPointer.h">
+      <Filter>Header Files\utils</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

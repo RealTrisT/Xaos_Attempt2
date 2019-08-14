@@ -122,6 +122,181 @@ void HmtxEntry::fix_endian() {
 }
 
 
+
+//--------------------------------------------------------------------------------------------------------------------------------------------//
+//-----------------------------------------------------------------GlyfEntry------------------------------------------------------------------//
+//--------------------------------------------------------------------------------------------------------------------------------------------//
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////  GlyfEntry -> getSimpleCoords
+
+bool GlyfEntry::getSimpleCoords(GlyfContours& vec) {
+	enum GlyfFlags {
+		//1 -> is on the curve, 0 is not on the curve
+		ON_CURVE = 0x01,
+		//whether or not the x coordinate for this point is an 8 bit unsigned or 16 bit signed
+		X_SHORT = 0x02,
+		//whether or not the y coordinate for this point is an 8 bit unsigned or 16 bit signed
+		Y_SHORT = 0x04,
+		//if this flag repeats - if 1, the next byte after this flag will be the number of repetitions
+		REPEAT = 0x08,
+		//if X_SHORT is set, this is the sign bit for the coord (1 = positive, 0 = negative)
+		//if X_SHORT IS not set, this indicates whether or not this X coord is equal to the last
+		X_SIGN_SAME = 0x10,
+		//if Y_SHORT is set, this is the sign bit for the coord (1 = positive, 0 = negative)
+		//if Y_SHORT IS not set, this indicates whether or not this Y coord is equal to the last
+		Y_SIGN_SAME = 0x20,
+		//doesn't matter
+		OVERLAP_SIMPLE = 0x40,
+		//doesn't matter
+		reserved = 0x80,
+	};
+
+	//if number of contours < 0 it's a compound glyph
+	if (this->num_contours < 0)return false;
+
+	//if number of contours is zero then it's blank, prolly like a space or something
+	else if (!this->num_contours)return true;
+
+
+
+	//pointer to array of end points
+	uint16_t* contour_end_points = (uint16_t*)simple_data;
+
+	//length of instructions for this glyph
+	uint16_t instruction_len = _byteswap_ushort(contour_end_points[this->num_contours]);
+
+	//pointer to instructions
+	uint8_t* instructions = (uint8_t*) &(contour_end_points[this->num_contours + 1]);
+
+	//save instructions
+	vec.instructions = std::vector<uint8_t>(instruction_len);
+	memcpy(vec.instructions.data(), instructions, instruction_len);
+
+	//pointer to flags (this pointer will be incremented as we parse the flags, and will end pointing to the beginning of the x coords array)
+	uint8_t* flags_ptr = &instructions[instruction_len];
+
+	//now we straight up fix the endianness of the whole contour end array
+	for (int16_t i = 0; i < this->num_contours; i++)contour_end_points[i] = _byteswap_ushort(contour_end_points[i]);
+
+
+	//the total dimension is gonna be the full amount of flags, which represent points, plus the number of contours for the repeated one at the end
+	uint32_t total_dimension = (contour_end_points[this->num_contours - 1] + 1) + this->num_contours;
+	//now we create the vector of vectors
+	vec = { std::vector<GlyfContours::GlyfCoords>(total_dimension), std::vector<uint16_t>(this->num_contours) };
+
+
+
+	//vector for the flags, the size will be the index of the last contour end point +1
+	std::vector<uint8_t> flags(contour_end_points[this->num_contours - 1] + 1);
+
+	//and now, for every flag that we will eventually have
+	for (uint16_t i = 0; i < flags.size(); i++) {
+		//get a flag from where the pointer points to
+		uint8_t current = *(flags_ptr++);
+		//and update the vector with it
+		flags[i] = current;
+
+		//if it contains the repeat flag
+		if (current & REPEAT) {
+			//get the amount of repetitions ( which is in the byte next to our current flag )
+			uint8_t repetitions = *(flags_ptr++);
+			//and fill the buffer with it
+			for (uint8_t ri = 0; ri < repetitions; ri++) {
+				//at our current index + repetition + 1
+				flags[i + ri + 1] = current;
+			}
+			//and then increase the index by the amount of repititions so we're on a new flag next loop
+			i += repetitions;
+		}
+	}
+
+
+
+	//then we create a union of a pointer, since we're gonna have coordinates which are 1 byte, and coordinates which are
+	//2 bytes, I felt this was a nice way to correctly increment the pointers without much hassle
+	union { uint8_t* point_location_8; int16_t* point_location_16; };
+	//so set this pointer to the flags pointer, which after we've parsed the flags, will be pointing to the x coords
+	point_location_8 = flags_ptr;
+
+	//and we define:
+	//	an x variable (because the coordinates represent movements, not absolute coords
+	//	a point index, that will increase through contours without reset so we can know where we are in the flag array
+	//	a contour end points index, so we know in which contour we at
+	//  a regular index so we know what we're adding to the stuff
+	//and we loop through the contours
+	GlyfContours::GlyfCoords* first = 0;
+	for (uint16_t x = 0, point_index = 0, i = 0, si = 0; point_index < flags.size(); point_index++, i++) {
+
+		//we first of all set the on curve bool, since it's now handy to us (we previously didn't have the vectors created)
+		vec.coords[i].on_curve = flags[point_index] & ON_CURVE;
+
+		//and if we have a short x, we read an 8-byte unsigned integer, and multiply it by what SIGN_SAME says the sign is
+		if (flags[point_index] & X_SHORT) {
+			x += (((flags[point_index] & X_SIGN_SAME) ? 1 : -1) * (*(point_location_8++)));
+			vec.coords[i].x = x;
+		}
+		else {
+			//otherwise, if SIGN_SAME is set, then that means this x is equal to the previous, so just set it on the vector
+			if (flags[point_index] & X_SIGN_SAME) {
+				vec.coords[i].x = x;
+			}
+			else {
+				//otherwise, it's a signed 16-bit value, so just add it up
+				x += (int16_t)_byteswap_ushort(*(point_location_16++));
+				vec.coords[i].x = x;
+			}
+		}
+		//we do this while increasing the x, since as previously mentioned, the coords are dislocations, not absolute coordinates
+
+		//if the first of the contour isn't set, we set it to the current
+		if (!first)first = &vec.coords[i];
+		//if we have found the end of a contour
+		if (si != this->num_contours && point_index == contour_end_points[si]) {
+			//ad the first point to the array to close the shape
+			vec.coords[++i].x = first->x;
+			//set the si'th skip to the current index, which is the last point in this contour
+			vec.skips[si++] = i;
+			//unset first, so the first will be set in the next iteration (since this is the 
+			//last iteration of the current contour, then it'll be set to the first of the next)
+			first = 0;
+		};
+
+	}
+
+	//here the same thing applies, but for the Y, and the vectors are already created with on_curve flags set, so we don't need to check those
+	for (uint16_t y = 0, point_index = 0, i = 0, si = 0; point_index < flags.size(); point_index++, i++) {
+
+		if (flags[point_index] & Y_SHORT) {
+			y += (((flags[point_index] & Y_SIGN_SAME) ? 1 : -1) * (*(point_location_8++)));
+			vec.coords[i].y = y;
+		}
+		else {
+			if (flags[point_index] & Y_SIGN_SAME) {
+				vec.coords[i].y = y;
+			}
+			else {
+				y += _byteswap_ushort(*(point_location_16++));
+				vec.coords[i].y = y;
+			}
+		}
+
+		//if we've found the end of a contour
+		if (si != this->num_contours && point_index == contour_end_points[si]) {
+			//add the closing point to it
+			vec.coords[++i] = vec.coords[(si) ? vec.skips[si - 1] + 1 : 0];
+			//and move on
+			si++;
+		}
+	}
+
+	return true;
+}
+
+
+//--------------------------------------------------------------------------------------------------------------------------------------------//
+//----------------------------------------------------------------Cmap Formats----------------------------------------------------------------//
+//--------------------------------------------------------------------------------------------------------------------------------------------//
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////// CMAP FORMAT 4 -> GLYPH INDEX
 FontTTF::GlyphID CmapFormat4::GetCheeseGlyphIndex(uint32_t cheese_code){
 	if (cheese_code >> 16)return 0; //format 4 only supports basic multilingual plane
@@ -149,19 +324,33 @@ FontTTF::GlyphID CmapFormat4::GetCheeseGlyphIndex(uint32_t cheese_code){
 	}
 }
 
+
+
+//--------------------------------------------------------------------------------------------------------------------------------------------//
+//---------------------------------------------------------------TrueTypeFontFile-------------------------------------------------------------//
+//--------------------------------------------------------------------------------------------------------------------------------------------//
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////// TRUETYPEFILE -> OPEN
 
-bool TrueTypeFontFile::Open(TrueTypeFontFile* instance, const char* path) {
-		#define this instance
-		
+const char* TrueTypeFontFile_errorlist[] = {
+	"Failed to open file",
+	"Could not read the offset subtable",
+	"Does not have the minimum number of required subtables",
+	"Failed to read the subtable information",
+	"Not all required tables present",
+};
+
+TrueTypeFontFile::TrueTypeFontFile(const char* path) {
+		uint32_t error_number;
+
 		//number of tables
 		uint16_t nt = 0;
 		
 		//if can't open file, fail. pretty obvious
-		if (fopen_s(&this->file, path, "rb")) goto fail;
+		if (fopen_s(&this->file, path, "rb")) { error_number = 0; goto fail; }
 		
 		//could not read the offset subtable
-		if (fread(&this->offs_subt, sizeof(OffsetSubtable), 1, this->file) != 1) goto fail_afteropen;
+		if (fread(&this->offs_subt, sizeof(OffsetSubtable), 1, this->file) != 1) { error_number = 1; goto fail_afteropen; }
 
 		//reverse endianness, these are big endian by default
 		this->offs_subt.fix_endian();
@@ -170,13 +359,13 @@ bool TrueTypeFontFile::Open(TrueTypeFontFile* instance, const char* path) {
 		nt = this->offs_subt.num_tables;
 
 		//did not have all the required subtables, which are 9, as can be read in https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6.html#Overview
-		if (nt < 9) goto fail_afteropen;
+		if (nt < 9) { error_number = 2; goto fail_afteropen; }
 
 		//initialize the vector (basically just using it as a buffer) - this is good because no surprise realocations to mess with our pointers
 		this->tables_info = std::vector<DirectoryTableEntry>(this->offs_subt.num_tables);
 
 		//attempt to read the tables' information
-		if (fread(this->tables_info.data(), sizeof(DirectoryTableEntry), nt, this->file) != nt)goto fail_afteropen;
+		if (fread(this->tables_info.data(), sizeof(DirectoryTableEntry), nt, this->file) != nt) { error_number = 3; goto fail_afteropen; }
 
 		//fix all the endianness stuff, and fill in the lookup table
 		for (uint16_t i = 0, current_table_tag = 0; i < nt; i++) {
@@ -194,26 +383,42 @@ bool TrueTypeFontFile::Open(TrueTypeFontFile* instance, const char* path) {
 				//plus, the user can just manually walkthrough the directory table, and then also manually read it into memory. Fuck the user lmao.
 		}
 		
-		//TODO: fail if not all the required tables are there, but that seems kinda lame rn
+		if(
+			!this->table_lookup[FONT_TABLE_cmap].table_entry || !this->table_lookup[FONT_TABLE_glyf].table_entry || !this->table_lookup[FONT_TABLE_head].table_entry ||
+			!this->table_lookup[FONT_TABLE_hhea].table_entry ||	!this->table_lookup[FONT_TABLE_hmtx].table_entry || !this->table_lookup[FONT_TABLE_loca].table_entry ||
+			!this->table_lookup[FONT_TABLE_maxp].table_entry || !this->table_lookup[FONT_TABLE_name].table_entry ||	!this->table_lookup[FONT_TABLE_post].table_entry
+		) {
+			error_number = 4;
+			goto fail_afteropen;
+		}
+
 
 		//for now do it
-		return true;
+		return;
 
 		fail_afteropen:
 			fclose(this->file);
 		fail:
-			return false;
-		#undef this
+			throw TracedException("TrueTypeFontFile::Constructor", error_number, TrueTypeFontFile_errorlist);
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////// TRUETYPEFILE -> DESTRUCTOR
+
+TrueTypeFontFile::~TrueTypeFontFile() {
+	for (LookupEntry& lu : this->table_lookup)if (lu.table_data)delete[]lu.table_data;
+	this->close();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////// TRUETYPEFILE -> CLOSE
 void TrueTypeFontFile::close() { 
+	if (!this->file)return;
 	fclose(this->file); 
+	this->file = 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////  TRUETYPEFILE -> LOAD TABLE (or return loaded table)
 
-void* TrueTypeFontFile::loadTable(TableTypes type){  //TODO deallocate the shit allocated here
+void* TrueTypeFontFile::loadTable(TableTypes type){
 	auto& tl = this->table_lookup[type];
 	if (tl.table_data)
 		return tl.table_data;
@@ -225,6 +430,11 @@ void* TrueTypeFontFile::loadTable(TableTypes type){  //TODO deallocate the shit 
 	}
 	return 0;
 }
+
+
+//--------------------------------------------------------------------------------------------------------------------------------------------//
+//---------------------------------------------------------------------FontTTF----------------------------------------------------------------//
+//--------------------------------------------------------------------------------------------------------------------------------------------//
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////  TRUETYPEFILE -> TAG VALUES
 
@@ -248,164 +458,12 @@ const uint32_t TrueTypeFontFile::TagValues[] = {
 	0x766D7478 /*vmtx*/,	0x78726566 /*xref*/,
 };
 
-
-enum GlyfFlags {
-	//1 -> is on the curve, 0 is not on the curve
-	ON_CURVE		= 0x01,
-	//whether or not the x coordinate for this point is an 8 bit unsigned or 16 bit signed
-	X_SHORT			= 0x02,
-	//whether or not the y coordinate for this point is an 8 bit unsigned or 16 bit signed
-	Y_SHORT			= 0x04,
-	//if this flag repeats - if 1, the next byte after this flag will be the number of repetitions
-	REPEAT			= 0x08,
-	//if X_SHORT is set, this is the sign bit for the coord (1 = positive, 0 = negative)
-	//if X_SHORT IS not set, this indicates whether or not this X coord is equal to the last
-	X_SIGN_SAME		= 0x10,
-	//if Y_SHORT is set, this is the sign bit for the coord (1 = positive, 0 = negative)
-	//if Y_SHORT IS not set, this indicates whether or not this Y coord is equal to the last
-	Y_SIGN_SAME		= 0x20,
-	//doesn't matter
-	OVERLAP_SIMPLE	= 0x40,
-	//doesn't matter
-	reserved		= 0x80,
+const char* FontTTF_errorlist[] = {
+	"Cmap format for unicode unsupported",
+	"Failed to init cmap",
 };
 
-bool GlyfEntry::getSimpleCoords(GlyfContours& vec){
-	//if number of contours < 0 it's a compound glyph
-	if (this->num_contours < 0)return false;
-
-	//if number of contours is zero then it's blank, prolly like a space or something
-	else if (!this->num_contours)return true;
-	
-	
-	
-	//pointer to array of end points
-	uint16_t* contour_end_points = (uint16_t*)simple_data;
-
-	//length of instructions for this glyph
-	uint16_t instruction_len = _byteswap_ushort(contour_end_points[this->num_contours]);
-
-	//pointer to instructions
-	uint8_t* instructions = (uint8_t*)&(contour_end_points[this->num_contours+1]);
-
-	//pointer to flags (this pointer will be incremented as we parse the flags, and will end pointing to the beginning of the x coords array)
-	uint8_t* flags_ptr = &instructions[instruction_len];
-
-	//now we straight up fix the endianness of the whole contour end array
-	for (int16_t i = 0; i < this->num_contours; i++)contour_end_points[i] = _byteswap_ushort(contour_end_points[i]);
-
-
-	//the total dimension is gonna be the full amount of flags, which represent points, plus the number of contours for the repeated one at the end
-	uint32_t total_dimension = (contour_end_points[this->num_contours - 1] + 1) + this->num_contours;
-	//now we create the vector of vectors
-	vec = { std::vector<GlyfContours::GlyfCoords>(total_dimension), std::vector<uint16_t>(this->num_contours) };
-	
-	
-	
-	//vector for the flags, the size will be the index of the last contour end point +1
-	std::vector<uint8_t> flags (contour_end_points[this->num_contours - 1] + 1);
-
-	//and now, for every flag that we will eventually have
-	for (uint16_t i = 0; i < flags.size(); i++) {
-		//get a flag from where the pointer points to
-		uint8_t current = *(flags_ptr++);
-		//and update the vector with it
-		flags[i] = current;
-
-		//if it contains the repeat flag
-		if (current & REPEAT) {
-			//get the amount of repetitions ( which is in the byte next to our current flag )
-			uint8_t repetitions = *(flags_ptr++);
-			//and fill the buffer with it
-			for (uint8_t ri = 0; ri < repetitions; ri++) {
-				//at our current index + repetition + 1
-				flags[i + ri + 1] = current;
-			}
-			//and then increase the index by the amount of repititions so we're on a new flag next loop
-			i += repetitions;
-		}
-	}
-
-
-
-	//then we create a union of a pointer, since we're gonna have coordinates which are 1 byte, and coordinates which are
-	//2 bytes, I felt this was a nice way to correctly increment the pointers without much hassle
-	union { uint8_t* point_location_8; int16_t* point_location_16; }; 
-	//so set this pointer to the flags pointer, which after we've parsed the flags, will be pointing to the x coords
-	point_location_8 = flags_ptr;
-
-	//and we define:
-	//	an x variable (because the coordinates represent movements, not absolute coords
-	//	a point index, that will increase through contours without reset so we can know where we are in the flag array
-	//	a contour end points index, so we know in which contour we at
-	//  a regular index so we know what we're adding to the stuff
-	//and we loop through the contours
-	GlyfContours::GlyfCoords* first = 0;
-	for (uint16_t x = 0, point_index = 0, i = 0, si = 0; point_index < flags.size(); point_index++, i++) {
-
-		//we first of all set the on curve bool, since it's now handy to us (we previously didn't have the vectors created)
-		vec.coords[i].on_curve = flags[point_index] & ON_CURVE;
-
-		//and if we have a short x, we read an 8-byte unsigned integer, and multiply it by what SIGN_SAME says the sign is
-		if (flags[point_index] & X_SHORT) {
-			x += (((flags[point_index] & X_SIGN_SAME) ? 1 : -1) * (*(point_location_8++)));
-			vec.coords[i].x = x;
-		} else {
-			//otherwise, if SIGN_SAME is set, then that means this x is equal to the previous, so just set it on the vector
-			if (flags[point_index] & X_SIGN_SAME) {
-				vec.coords[i].x = x;
-			} else {
-				//otherwise, it's a signed 16-bit value, so just add it up
-				x += (int16_t)_byteswap_ushort(*(point_location_16++));
-				vec.coords[i].x = x;
-			}
-		}
-		//we do this while increasing the x, since as previously mentioned, the coords are dislocations, not absolute coordinates
-
-		//if the first of the contour isn't set, we set it to the current
-		if (!first)first = &vec.coords[i];
-		//if we have found the end of a contour
-		if (si != this->num_contours && point_index == contour_end_points[si]) {
-			//ad the first point to the array to close the shape
-			vec.coords[++i].x = first->x;
-			//set the si'th skip to the current index, which is the last point in this contour
-			vec.skips[si++] = i;
-			//unset first, so the first will be set in the next iteration (since this is the 
-			//last iteration of the current contour, then it'll be set to the first of the next)
-			first = 0;
-		};
-		
-	}
-
-	//here the same thing applies, but for the Y, and the vectors are already created with on_curve flags set, so we don't need to check those
-	for (uint16_t y = 0, point_index = 0, i = 0, si = 0; point_index < flags.size(); point_index++, i++) {
-		
-		if (flags[point_index] & Y_SHORT) {
-			y += (((flags[point_index] & Y_SIGN_SAME) ? 1 : -1) * (*(point_location_8++)));
-			vec.coords[i].y = y;
-		} else {
-			if (flags[point_index] & Y_SIGN_SAME) {
-				vec.coords[i].y = y;
-			} else {
-				y += _byteswap_ushort(*(point_location_16++));
-				vec.coords[i].y = y;
-			}
-		}
-
-		//if we've found the end of a contour
-		if (si != this->num_contours && point_index == contour_end_points[si]) {
-			//add the closing point to it
-			vec.coords[++i] = vec.coords[(si) ? vec.skips[si - 1] + 1 : 0];
-			//and move on
-			si++;
-		}		
-	}
-
-	return true;
-}
-
-bool FontTTF::Init(FontTTF* instance, TrueTypeFontFile* ttff){
-#define this instance
+FontTTF::FontTTF(TrueTypeFontFile* ttff){
 	HeadTable* head = (HeadTable*)ttff->loadTable(TrueTypeFontFile::FONT_TABLE_head);
 	MaxpTable* maxp = (MaxpTable*)ttff->loadTable(TrueTypeFontFile::FONT_TABLE_maxp);
 	void*     vloca =      (void*)ttff->loadTable(TrueTypeFontFile::FONT_TABLE_loca);
@@ -414,13 +472,38 @@ bool FontTTF::Init(FontTTF* instance, TrueTypeFontFile* ttff){
 	HheaTable* hhea = (HheaTable*)ttff->loadTable(TrueTypeFontFile::FONT_TABLE_hhea);
 	HmtxEntry* hmtx = (HmtxEntry*)ttff->loadTable(TrueTypeFontFile::FONT_TABLE_hmtx);
 
-	if (!head || !maxp || !vloca || !glyf || !cmap || !hhea || !hmtx)return false;
-	head->fix_endian();	maxp->fix_endian(); cmap->fix_endian(); hhea->fix_endian();
+	head->fix_endian();	maxp->fix_endian(); hhea->fix_endian();
 
 	this->units_per_EM = head->units_per_EM;
 	this->line_gap = hhea->line_gap;
 
 	this->x_min = head->x_min; this->y_min = head->y_min; this->x_max = head->x_max; this->y_max = head->y_max;
+
+	try { this->InitCmap(cmap); }
+	catch (TracedException& e) { throw TracedException("FontTTF::Constructor", 1, FontTTF_errorlist); }
+
+	if (head->index_to_loc_format)	this->InitGlyphs( (LocaEntryLong*)vloca, glyf, maxp, this->InitIndexes( (LocaEntryLong*)vloca, maxp));
+	else							this->InitGlyphs((LocaEntryShort*)vloca, glyf, maxp, this->InitIndexes((LocaEntryShort*)vloca, maxp));
+
+	this->InitHorMetrics(maxp, hhea, head, hmtx);
+
+	return;
+}
+
+FontTTF::~FontTTF() {
+	if (leftside_bearings)
+		delete[] leftside_bearings;
+	delete[] adv_widths;
+	delete[] glyphs;
+	delete[] textures;
+	delete[] indexes;
+	delete[] unicode_lookup;
+}
+
+#pragma region InitializationFunctions
+
+void FontTTF::InitCmap(CmapTable* cmap) {
+	cmap->fix_endian();
 
 	for (uint16_t i = 0; i < cmap->num_subtables; i++) {
 		cmap->entries[i].fix_endian();
@@ -443,53 +526,43 @@ bool FontTTF::Init(FontTTF* instance, TrueTypeFontFile* ttff){
 				}
 				default: {
 					delete[] this->unicode_lookup;
-					return 0;
+					throw TracedException("FontTTF::InitCmap", 0, FontTTF_errorlist);
 				}
 			}
 		}
 	}
+}
 
+template<class loca_type> 
+uint16_t FontTTF::InitIndexes(loca_type* loca, MaxpTable* maxp) {
+	this->indexes = new uint16_t[maxp->num_glyphs + 1];
 	uint16_t real_number_of_glyphs = 0;
-	this->indexes = new uint16_t[maxp->num_glyphs+1];
 
-	if (head->index_to_loc_format) {
-		LocaEntryLong* loca = (LocaEntryLong*)vloca;
-		for (uint16_t i = 0; i < maxp->num_glyphs; i++) { loca[i].fix_endian();
-			this->indexes[i] = real_number_of_glyphs;
-			if (loca[i].offset != loca[i + 1].offset)real_number_of_glyphs++;
-		}this->indexes[maxp->num_glyphs] = real_number_of_glyphs;
-	}else{
-		LocaEntryShort* loca = (LocaEntryShort*)vloca;
-		for (uint16_t i = 0; i < maxp->num_glyphs; i++) { loca[i].fix_endian();
-			this->indexes[i] = real_number_of_glyphs;
-			if (loca[i].offset != loca[i + 1].offset)real_number_of_glyphs++;
-		}this->indexes[maxp->num_glyphs] = real_number_of_glyphs;
+	for (uint16_t i = 0; i < maxp->num_glyphs; i++) { loca[i].fix_endian();
+		this->indexes[i] = real_number_of_glyphs;
+		if (loca[i].offset != loca[i + 1].offset)real_number_of_glyphs++;
+	}this->indexes[maxp->num_glyphs] = real_number_of_glyphs;
+
+	return real_number_of_glyphs;
+}
+
+template<class loca_type>
+void FontTTF::InitGlyphs(loca_type* loca, GlyfEntry* glyf, MaxpTable* maxp, uint16_t real_number_of_glyphs) {
+
+	this->glyphs   = new GlyphInfo[real_number_of_glyphs];
+	this->textures = new std::vector<RenderedGlyphIndexing>[real_number_of_glyphs];
+
+	for (uint16_t i = 0; i < maxp->num_glyphs; i++) {
+		if (loca[i].offset == loca[i + 1].offset)continue;
+
+		GlyfEntry* glyf_entry = (GlyfEntry*)(((uint8_t*)glyf) + loca[i].GetOffset()); glyf_entry->fix_endian();
+
+		this->glyphs[this->indexes[i]] = { glyf_entry->x_min, glyf_entry->y_min, glyf_entry->x_max, glyf_entry->y_max, {} };
+		glyf_entry->getSimpleCoords(this->glyphs[this->indexes[i]].contours);
 	}
-	
-	this->glyphs	= new GlyphInfo							[real_number_of_glyphs];
-	this->textures	= new std::vector<RenderedGlyphIndexing>[real_number_of_glyphs];
+}
 
-	if (head->index_to_loc_format) {
-		LocaEntryLong* loca = (LocaEntryLong*)vloca;
-		for (uint16_t i = 0; i < maxp->num_glyphs; i++) {
-			if (loca[i].offset == loca[i + 1].offset)continue;
-			GlyfEntry* glyf_entry = (GlyfEntry*)(((uint8_t*)glyf) + loca[i].offset); glyf_entry->fix_endian();
-			//repeated code repeated code repeated code repeated code repeated code repeated code >
-			this->glyphs[this->indexes[i]] = { glyf_entry->x_min, glyf_entry->y_min, glyf_entry->x_max, glyf_entry->y_max, {} };
-			glyf_entry->getSimpleCoords(this->glyphs[this->indexes[i]].contours);
-			//repeated code repeated code repeated code repeated code repeated code repeated code <
-		}
-	} else {
-		LocaEntryShort* loca = (LocaEntryShort*)vloca;
-		for (uint16_t i = 0; i < maxp->num_glyphs; i++) {
-			GlyfEntry* glyf_entry = (GlyfEntry*)((uint8_t*)glyf + loca[i].offset*2); glyf_entry->fix_endian();
-			//repeated code repeated code repeated code repeated code repeated code repeated code >
-			this->glyphs[i] = { glyf_entry->x_min, glyf_entry->y_min, glyf_entry->x_max, glyf_entry->y_max, {} };
-			glyf_entry->getSimpleCoords(this->glyphs[i].contours);
-			//repeated code repeated code repeated code repeated code repeated code repeated code <
-		}
-	}
-
+void FontTTF::InitHorMetrics(MaxpTable* maxp, HheaTable* hhea, HeadTable* head, HmtxEntry* hmtx) {
 	this->adv_widths_count = hhea->num_long_hor_metrics;
 	this->adv_widths = new uint16_t[this->adv_widths_count];
 
@@ -500,22 +573,22 @@ bool FontTTF::Init(FontTTF* instance, TrueTypeFontFile* ttff){
 			hmtx[i].fix_endian();
 			this->adv_widths[i] = hmtx[i].advance_width;
 		}
-	} else {
+	}
+	else {
 		this->leftside_bearings = new int16_t[maxp->num_glyphs];
 
 		for (uint16_t i = 0; i < this->adv_widths_count; i++) {
 			hmtx[i].fix_endian();
 			this->adv_widths[i] = hmtx[i].advance_width;
 			this->leftside_bearings[i] = hmtx[i].left_side_bearing;
-		}for (uint16_t i = 0, *LSBs = (uint16_t*)&hmtx[this->adv_widths_count]; i < maxp->num_glyphs - this->adv_widths_count; i++) {
+		}for (uint16_t i = 0, *LSBs = (uint16_t*)& hmtx[this->adv_widths_count]; i < maxp->num_glyphs - this->adv_widths_count; i++) {
 			this->leftside_bearings[i] = LSBs[i];
 		}
 
 	}
-
-	return true;
-#undef this
 }
+
+#pragma endregion functions called by the constructor
 
 
 uint32_t FontTTF::UnicodeGlyphLookup(uint32_t cheese_code) {

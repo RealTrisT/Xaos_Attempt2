@@ -7,33 +7,51 @@
 
 #include "Cmd.h"
 struct CMD {
+	MansInterfacin* g;
+	RedirectedStandardIOProcess p;
+	WindowSystem::Text::Font* font;
+	WindowSystem::Text::RenderableText line_numbers, tab_names;
+	unsigned line_nrs_size;
+
+	WindowSystem::Text::RenderableText* inputs, * outputs;
+	unsigned* inputs_sizes,* outputs_sizes;
+
+	std::vector<f3coord> vertexes;
+	std::vector<colortexel> colors;
+	std::vector<uint32_t> indexes;
+	MansInterfacin::UI::VertexBuffer* vbuffers[2];
+	MansInterfacin::UI::IndexBuffer* index_buffer;
+
+	unsigned x, y;
+	unsigned width, height;
+	unsigned input_height;
+
+	unsigned curr_tab_index = 0;
+
 	CMD(MansInterfacin* g, WindowSystem::Text::Font* font, unsigned x, unsigned y, unsigned width, unsigned height) : 
 		g(g), font(font), x(x), y(y), width(width), height(height),
 		p(RedirectedStandardIOProcess("C:\\Windows\\System32\\cmd.exe")),
 		line_numbers(WindowSystem::Text::RenderableText(font, sizeof("StdOut     StdErr"))),
-		tab_names(WindowSystem::Text::RenderableText(font, 1024))
+		tab_names(WindowSystem::Text::RenderableText(font, 1024)), line_nrs_size(1024)
 	{
 		outputs = new WindowSystem::Text::RenderableText[2]{
 			WindowSystem::Text::RenderableText(font, 4096),
 			WindowSystem::Text::RenderableText(font, 4096),
-		};
+		};outputs_sizes = new unsigned[2]{ 4096, 4096 };
 		inputs = new WindowSystem::Text::RenderableText[2]{
 			WindowSystem::Text::RenderableText(font, 4096),
 			WindowSystem::Text::RenderableText(font, 4096),
-		};
+		}; inputs_sizes = new unsigned[2]{ 4096, 4096 };
 		vertexes = std::vector<f3coord>(4 * 7); //7 squares, 2 for input and output background, one for borders, 2 for scroll bars, 2 for separator between tab sizes
 		colors = std::vector<colortexel>(4 * 7) = {
-			{{0.561, 0.212, 0.537, 0.4}, {0, 0}}, {{0.561, 0.212, 0.537, 0.4}, {0, 0}}, {{0.561, 0.212, 0.537, 0.4}, {0, 0}}, {{0.561, 0.212, 0.537, 0.4}, {0, 0}},
-			{{0.561, 0.212, 0.537, 0.4}, {0, 0}}, {{0.561, 0.212, 0.537, 0.4}, {0, 0}}, {{0.561, 0.212, 0.537, 0.4}, {0, 0}}, {{0.561, 0.212, 0.537, 0.4}, {0, 0}},
-			{{1, 1, 1, 1}, {0, 0}}, {{1, 1, 1, 1}, {0, 0}}, {{1, 1, 1, 1}, {0, 0}}, {{1, 1, 1, 1}, {0, 0}},
+			{{0.561, 0.212, 0.537, 0.4}, {0, 0}},	{{0.561, 0.212, 0.537, 0.4}, {0, 0}},	{{0.561, 0.212, 0.537, 0.4}, {0, 0}},	{{0.561, 0.212, 0.537, 0.4}, {0, 0}},
+			{{0.561, 0.212, 0.537, 0.4}, {0, 0}},	{{0.561, 0.212, 0.537, 0.4}, {0, 0}},	{{0.561, 0.212, 0.537, 0.4}, {0, 0}},	{{0.561, 0.212, 0.537, 0.4}, {0, 0}},
+			{{1, 1, 1, 1}, {0, 0}},					{{1, 1, 1, 1}, {0, 0}},					{{1, 1, 1, 1}, {0, 0}},					{{1, 1, 1, 1}, {0, 0}},
 
-			{{1, 1, 1, 1}, {0, 0}}, {{1, 1, 1, 1}, {0, 0}}, {{1, 1, 1, 1}, {0, 0}}, {{1, 1, 1, 1}, {0, 0}},
-			{{1, 1, 1, 1}, {0, 0}}, {{1, 1, 1, 1}, {0, 0}}, {{1, 1, 1, 1}, {0, 0}}, {{1, 1, 1, 1}, {0, 0}},
-
-			{{1, 1, 1, 1}, {0, 0}}, {{1, 1, 1, 1}, {0, 0}}, {{1, 1, 1, 1}, {0, 0}}, {{1, 1, 1, 1}, {0, 0}},
-			{{1, 1, 1, 1}, {0, 0}}, {{1, 1, 1, 1}, {0, 0}}, {{1, 1, 1, 1}, {0, 0}}, {{1, 1, 1, 1}, {0, 0}},
-		}; *((f4color*)& colors[0].t) = { 1, 1, 1, 1 };
-		indexes = std::vector<uint32_t>(4 * 7) = {
+			{{0, 0, 0, 1}, {0, 0}},					{{0, 0, 0, 1}, {0, 0}},					{{0, 0, 0, 1}, {0, 0}},					{{0, 0, 0, 1}, {0, 0}},
+			{{0, 0, 0, 1}, {0, 0}},					{{0, 0, 0, 1}, {0, 0}},					{{0, 0, 0, 1}, {0, 0}},					{{0, 0, 0, 1}, {0, 0}},
+		};
+		indexes = std::vector<uint32_t>(6 * 7) = {
 			0, 1, 2, 2, 1, 3,
 			4, 5, 6, 6, 5, 7,
 			8, 9, 10, 10, 9, 11,
@@ -44,6 +62,14 @@ struct CMD {
 		index_buffer = g->ui.CreateIndexBuffer(sizeof(uint32_t),	indexes.size(),  MansInterfacin::UI::ResourceModifyFreq::SOMETIMES, (uint8_t*)indexes.data());
 
 		input_height = 16 + 2;
+	}
+
+	~CMD() {
+		g->ui.DestroyIndexBuffer(index_buffer);
+		g->ui.DestroyVertexBuffer(vbuffers[1]);
+		g->ui.DestroyVertexBuffer(vbuffers[0]);
+		delete[] outputs; delete[] inputs;
+		delete[] outputs_sizes; delete[] inputs_sizes;
 	}
 
 	void InitLayout() {
@@ -64,6 +90,28 @@ struct CMD {
 		border_bg[2] = { 0, float(height), 0 }; border_bg[3] = { float(width), float(height), 0 };
 
 		g->ui.UpdateVertexBuffer(vbuffers[0], (uint8_t*)vertexes.data());
+
+		for (auto& y : this->outputs[0].cnt)y.c = { 1, 1, 1, 1 };
+	}
+
+	void SetText(uint32_t* max_length, WindowSystem::Text::RenderableText* renderable_text, const char* text, uint32_t length) {
+		if (*max_length < length) {
+			renderable_text->~RenderableText();
+			new (renderable_text) WindowSystem::Text::RenderableText(
+				font,
+				*max_length = (unsigned)pow(2, ceil(log(length) / log(2)))
+			);
+			for (auto& y : renderable_text->cnt)y.c = { 1, 1, 1, 1 };
+		}
+			
+		renderable_text->ReadyString(text, 16, this->width - 4);
+	}
+	void SetOutputText(uint32_t tabindex, const char* text, uint32_t length) {
+		this->SetText(&this->outputs_sizes[tabindex], &this->outputs[tabindex], text, length);
+	}
+
+	void SetInputText(uint32_t tabindex, const char* text, uint32_t length) {
+		this->SetText(&this->inputs_sizes[tabindex], &this->inputs[tabindex], text, length);
 	}
 
 	void Draw() {
@@ -77,22 +125,14 @@ struct CMD {
 		g->graphics_system.SetPaintingStencilState(1);
 		g->graphics_system.Draw(12, 6);
 		g->graphics_system.ClearStencilBuffer();
+
+
+		g->graphics_system.SetTopology(MansInterfacin::GraphicsSystem::Topologies::TRIANGLE_STRIP);
+		g->graphics_system.SetNullStencilState();
+		g->graphics_system.SetRenderFontState();
+		g->graphics_system.SetRenderOffset({ float(x) + 6, float(y) + 6, 0 });
+		this->outputs[0].Render();
 	}
-
-	MansInterfacin* g;
-	RedirectedStandardIOProcess p;
-	WindowSystem::Text::Font* font;
-	WindowSystem::Text::RenderableText line_numbers, tab_names;
-	WindowSystem::Text::RenderableText* inputs, * outputs;
-	std::vector<f3coord> vertexes;
-	std::vector<colortexel> colors;
-	std::vector<uint32_t> indexes;
-	MansInterfacin::UI::VertexBuffer* vbuffers[2];
-	MansInterfacin::UI::IndexBuffer* index_buffer;
-
-	unsigned x, y;
-	unsigned width, height;
-	unsigned input_height;
 };
 
 
@@ -157,13 +197,14 @@ int main() {
 
 	CMD mygaycmd(elUD, &fonti, 678, 121, 1785-678, 721-121);
 	mygaycmd.InitLayout();
+	mygaycmd.SetOutputText(0, "Console is on the way, yes. Further text my friend lMao", 56);
 	mygaycmd.Draw();
 
 
-	elUD->graphics_system.SetRenderOffset({ float(mygaycmd.x + 6), float(mygaycmd.y + 19), 0 });
-	niga.ReadyString("Console is on the way, yes.", 18, 0);
-	niga.Render();
-	elUD->graphics_system.SetRenderOffset({ float(mygaycmd.x - 23), float(mygaycmd.y + 19), 0 });
+	/*elUD->graphics_system.SetRenderOffset({ float(mygaycmd.x + 6), float(mygaycmd.y + 6), 0 });
+	niga.ReadyString("Console is on the way, yes. Further text my friend lmao", 18, 0);
+	niga.Render();*/
+	elUD->graphics_system.SetRenderOffset({ float(mygaycmd.x - 23), float(mygaycmd.y + 6), 0 });
 	niga.ReadyString(" 1\n 2\n 3\n 4\n 5\n 6\n 7\n 8\n 9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n20\n21\n22\n23\n24\n25\n26\n27\n28\n29\n30\n31\n32\n33\n34\n35\n36\n37\n38\n39\n40\n41\n42\n43\n44", 18, 0);
 	for (size_t i = 0; i < niga.cnt.size(); i += 4) {
 		float alpha_upper = (float(mygaycmd.height) - niga.coords[i].y) / mygaycmd.height;

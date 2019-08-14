@@ -21,6 +21,9 @@
 
 
 #include <string>
+
+
+
 struct CreatedChildProcess {
 	CreatedChildProcess(std::string path) : path(path) { startup_info.cb = sizeof(STARTUPINFOA); }
 
@@ -59,6 +62,18 @@ struct RedirectedStandardIOProcess : public CreatedChildProcess {
 	}
 
 
+	uint32_t ByteCountInError() {
+		DWORD available = 0;
+		if (PeekNamedPipe(this->standard_error_piperead, NULL, 0, NULL, &available, NULL) && available)return available;
+		return false;
+	}
+	uint32_t ReadError(const char* buffer, uint32_t max) {
+		DWORD amount_read = 0;
+		if (!ReadFile(this->standard_error_piperead, (void*)buffer, max, &amount_read, 0))return 0;
+		return amount_read;
+	}
+
+
 	uint32_t ByteCountInOutput() {
 		DWORD available = 0;
 		if (!PeekNamedPipe(this->standard_output_piperead, NULL, 0, NULL, &available, NULL))return -1;
@@ -70,16 +85,6 @@ struct RedirectedStandardIOProcess : public CreatedChildProcess {
 		return amount_read;
 	}
 
-	uint32_t ByteCountInError() {
-		DWORD available = 0;
-		if (PeekNamedPipe(this->standard_error_piperead, NULL, 0, NULL, &available, NULL) && available)return available;
-		return false;
-	}
-	uint32_t ReadError(const char* buffer, uint32_t max) {
-		DWORD amount_read = 0;
-		if (!ReadFile(this->standard_error_piperead, (void*)buffer, max, &amount_read, 0))return 0;
-		return amount_read;
-	}
 	uint32_t WriteToInput(const char* buffer, uint32_t amount) {
 		DWORD bytes_written = 0;
 		if(!WriteFile(this->standard_input_pipewrite, buffer, amount, &bytes_written, 0))return 0;
